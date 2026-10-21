@@ -5,3 +5,8 @@ export interface Cell {
 }
 
 export type Board = Cell[];
+
+export interface GeneratedBoard {
+  puzzle: Board;
+  solution: Board;
+}

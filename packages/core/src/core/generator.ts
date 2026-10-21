@@ -1,5 +1,5 @@
 import seedrandom from "seedrandom";
-import type { Board, Cell } from "../types/board.type.js";
+import type { Board, Cell, GeneratedBoard } from "../types/board.type.js";
 import { PEERS } from "../constants/cordinates.js";
 
 const CELL_COUNT = PEERS.length;
@@ -11,8 +11,8 @@ const SOLUTION_LIMIT = 2;
 const DIG_MIN_HINTS = 25;
 const DIG_ATTEMPTS = 10;
 
-// Bit `digit` represents `digit`, so bits 1..9 (0b1111111110) are the valid digits.
-const ALL_DIGITS = 0x3fe;
+// Bit `digit - 1` represents `digit`, matching the solver's candidate masks.
+const ALL_DIGITS = 0b111111111;
 const ALL_INDICES: readonly number[] = PEERS.map((_peers, index) => index);
 
 // Known 17-clue puzzles from Gordon Royle's collection. Used as starting points
@@ -42,7 +42,7 @@ interface GridTransform {
 
 const SOLVED: Choice = { index: -1, candidates: 0 };
 
-const digitBit = (digit: number): number => 1 << digit;
+const digitBit = (digit: number): number => 1 << (digit - 1);
 const gridAt = (grid: Uint16Array, index: number): number => grid[index] ?? 0;
 
 const candidatesAt = (grid: Uint16Array, index: number): number => {
@@ -195,11 +195,13 @@ const toBoard = (grid: Uint16Array): Board =>
     return value === 0 ? { value: null, candidates: candidatesAt(grid, index) } : { value, candidates: 0 };
   });
 
-const digBoard = (hints: number, random: () => number): Board | null => {
+const digBoard = (hints: number, random: () => number): GeneratedBoard | null => {
   for (let attempt = 0; attempt < DIG_ATTEMPTS; attempt += 1) {
     const grid = new Uint16Array(CELL_COUNT);
     if (!fillSolution(grid, random)) continue;
 
+    // Snapshot the completed grid before digging, since digging empties cells.
+    const solution = new Uint16Array(grid);
     const order = shuffleNumbers(ALL_INDICES.slice(), random);
     let clues = CELL_COUNT;
 
@@ -216,12 +218,12 @@ const digBoard = (hints: number, random: () => number): Board | null => {
       }
     }
 
-    if (clues === hints) return toBoard(grid);
+    if (clues === hints) return { puzzle: toBoard(grid), solution: toBoard(solution) };
   }
   return null;
 };
 
-const seedBoard = (hints: number, random: () => number): Board => {
+const seedBoard = (hints: number, random: () => number): GeneratedBoard => {
   const seed = SEED_PUZZLES[Math.floor(random() * SEED_PUZZLES.length)] ?? SEED_PUZZLES[0] ?? "";
   const puzzle = parseGrid(seed);
   const solution = new Uint16Array(puzzle);
@@ -242,7 +244,7 @@ const seedBoard = (hints: number, random: () => number): Board => {
     place(grid, index, gridAt(solved, index));
     clues += 1;
   }
-  return toBoard(grid);
+  return { puzzle: toBoard(grid), solution: toBoard(solved) };
 };
 
 /**
@@ -253,13 +255,14 @@ const seedBoard = (hints: number, random: () => number): Board => {
  * realistically be reached that way, so a known 17-clue puzzle is randomly
  * transformed and padded with solution clues instead (also used as a fallback).
  *
- * Empty cells carry a candidate bitmask where bit `n` stands for digit `n`
- * (bits 1..9). Filled cells have no candidates (`0`).
+ * Returns the puzzle together with its unique, fully filled solution. Empty puzzle
+ * cells carry a candidate bitmask where bit `n - 1` stands for digit `n`; filled
+ * puzzle cells and every solution cell have no candidates (`0`).
  *
  * Pass `seed` to make generation deterministic: the same hints and seed always
- * produce the same board. Omit it for a randomly seeded board.
+ * produce the same puzzle and solution. Omit it for a randomly seeded board.
  */
-export function newBoard(hints: number, seed?: string): Board {
+export function newBoard(hints: number, seed?: string): GeneratedBoard {
   if (!Number.isInteger(hints) || hints < MIN_HINTS || hints > MAX_HINTS) throw new RangeError(`Invalid hint count`);
 
   const random = seed === undefined ? seedrandom() : seedrandom(seed);

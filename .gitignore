@@ -27,6 +27,11 @@ yarn-error.log*
 *.swo
 *~
 
+# Local debug scratch files
+*debug*.mjs
+*debug*.js
+*debug*.ts
+
 # OS files
 .DS_Store
 Thumbs.db
