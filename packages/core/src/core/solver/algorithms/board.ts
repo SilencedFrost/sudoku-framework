@@ -75,7 +75,7 @@ export function solvePointingPairs(board: Board, config: BasicConfig = {}): Boar
   if (!results) return null;
   const newBoard = [...board];
   for (const { remove, mask } of results) {
-    for (const index of remove) newBoard[index] = removeCandidate(board, index, mask);
+    for (const index of remove) newBoard[index] = removeCandidate(newBoard, index, mask);
   }
   return newBoard;
 }

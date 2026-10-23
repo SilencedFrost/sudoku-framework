@@ -52,7 +52,7 @@ export function solveClaiming(board: Board): Board | null {
   if (!solution) return null;
   const newBoard = [...board];
   const mask = indexToMask(solution.value);
-  for (const index of solution.remove) newBoard[index] = removeCandidate(board, index, mask);
+  for (const index of solution.remove) newBoard[index] = removeCandidate(newBoard, index, mask);
   return newBoard;
 }
 
@@ -89,6 +89,6 @@ export function solveHiddenPair(board: Board): Board | null {
   const solution = findHiddenPair(board);
   if (!solution) return null;
   const newBoard = [...board];
-  for (const index of solution.remove) newBoard[index] = removeCandidate(board, index, ~solution.mask);
+  for (const index of solution.remove) newBoard[index] = removeCandidate(newBoard, index, ~solution.mask);
   return newBoard;
 }
