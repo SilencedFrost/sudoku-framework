@@ -1,14 +1,8 @@
 import { IllegalStateError } from "../classes/errors.js";
-import { FULL_CANDIDATE_MASK } from "../constants/bitwise.js";
+import { FULL_DIGIT_MASK } from "../constants/bitwise.js";
 import { PEERS } from "../constants/cordinates.js";
 import type { Board, Cell } from "../types/board.type.js";
-import { indexToMask } from "../utils/bitwise.js";
-
-export function getCell(board: Board, index: number): Cell {
-  const cell = board[index];
-  if (!cell) throw new RangeError(`Cell is falsy with index ${index.toString()}`);
-  return cell;
-}
+import { indexToMask, isBitSet } from "./bitwise.js";
 
 export function getUnit<T>(unit: readonly T[], index: number): T {
   const indexes = unit[index];
@@ -26,7 +20,7 @@ export function sanitizeCandidates(board: Board, rebuild = false): Board {
     if (!peers) throw new RangeError(`Peers is falsy with index ${i.toString()}`);
 
     // Extract cell data
-    const cell = getCell(board, i);
+    const cell = getUnit(board, i);
 
     // Early exit for solved cells: reuse the original object if the mask is already normalized
     if (cell.value) {
@@ -37,11 +31,11 @@ export function sanitizeCandidates(board: Board, rebuild = false): Board {
 
     let used = 0;
     for (const index of peers) {
-      const peer = getCell(board, index);
+      const peer = getUnit(board, index);
       if (peer.value) used |= indexToMask(peer.value);
     }
 
-    const candidates = (rebuild ? FULL_CANDIDATE_MASK : cell.candidates) & ~used;
+    const candidates = (rebuild ? FULL_DIGIT_MASK : cell.candidates) & ~used;
     if (candidates === 0) throw new IllegalStateError(IllegalStateError.Code.NO_CANDIDATES);
     newBoard[i] = cell.candidates === candidates ? cell : { ...cell, candidates };
   }
@@ -49,8 +43,30 @@ export function sanitizeCandidates(board: Board, rebuild = false): Board {
 }
 
 export function removeCandidate(board: Board, index: number, mask: number): Cell {
-  const cell = getCell(board, index);
+  const cell = getUnit(board, index);
+  if (cell.value) return cell;
   const newCandidates = cell.candidates & ~mask;
-  if (newCandidates === 0) throw new IllegalStateError(IllegalStateError.Code.NO_CANDIDATES);
+  if (newCandidates === 0) throw new IllegalStateError(IllegalStateError.Code.NO_CANDIDATES, index);
   return cell.candidates === newCandidates ? cell : { ...cell, candidates: newCandidates };
+}
+
+export function* candidatesToDigitMasks(board: Board, indexes: readonly number[]): Generator<{ digit: number; mask: number }> {
+  let eligible = FULL_DIGIT_MASK;
+  const candidates: number[] = [];
+  for (const index of indexes) {
+    const cell = getUnit(board, index);
+    if (cell.value) {
+      eligible &= ~indexToMask(cell.value);
+      candidates.push(0);
+    } else {
+      candidates.push(cell.candidates);
+    }
+  }
+
+  for (let i = 1; i <= 9; i++) {
+    if (!isBitSet(eligible, i)) continue;
+    const digitMask = indexToMask(i);
+    const positionMask = candidates.reduce((mask, candidate, j) => ((candidate & digitMask) !== 0 ? mask | (1 << j) : mask), 0);
+    yield { digit: i, mask: positionMask };
+  }
 }
