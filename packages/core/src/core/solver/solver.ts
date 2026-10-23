@@ -1,9 +1,8 @@
 import type { Board } from "../../types/board.type.js";
 import type { Algorithm } from "../../types/algorithms.type.js";
 import { sanitizeCandidates } from "../../utils/board.js";
-import { solveClaiming, solveHiddenPair, solvePointingPairs } from "./algorithms/algorithms.js";
-import { solveFullHouses, solveNakedSets, solveNakedSingles } from "./algorithms/board.js";
-import { solveHiddenSinglesBoxes, solveHiddenSinglesLines } from "./algorithms/houses.js";
+import { solveClaiming, solveHiddenPair } from "./algorithms/algorithms.js";
+import { solveFullHouses, solveHiddenSinglesBoxes, solveHiddenSinglesLines, solveNakedSets, solveNakedSingles, solvePointingPairs } from "./algorithms/board.js";
 
 // TODO: improve solveAll with bulk actions + stateful skipping (Owns the loop, selective calling, dirty house tracking)
 export function solveAll(board: Board): Board {
@@ -38,7 +37,7 @@ export function solveStep(board: Board, { candidates = "sanitize" }: { candidate
   const nakedSingle = solveNakedSingles(newBoard, { first: false });
   if (nakedSingle) return { board: nakedSingle, alg: "NakedSingle" };
 
-  const pointingPairs = solvePointingPairs(newBoard);
+  const pointingPairs = solvePointingPairs(newBoard, { first: false });
   if (pointingPairs) return { board: pointingPairs, alg: "PointingPairs" };
 
   const claiming = solveClaiming(newBoard);

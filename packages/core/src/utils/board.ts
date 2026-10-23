@@ -5,9 +5,9 @@ import type { Board, Cell } from "../types/board.type.js";
 import { indexToMask, isBitSet } from "./bitwise.js";
 
 export function getUnit<T>(unit: readonly T[], index: number): T {
-  const indexes = unit[index];
-  if (indexes == null) throw new RangeError(`Unit is nullish with index ${index.toString()}`);
-  return indexes;
+  const value = unit[index];
+  if (value == null) throw new RangeError(`Unit is nullish with index ${index.toString()}`);
+  return value;
 }
 
 // Trust caller candidates if rebuild = false
@@ -62,6 +62,8 @@ export function* candidatesToDigitMasks(board: Board, indexes: readonly number[]
       candidates.push(cell.candidates);
     }
   }
+
+  if (eligible === 0) return;
 
   for (let i = 1; i <= 9; i++) {
     if (!isBitSet(eligible, i)) continue;

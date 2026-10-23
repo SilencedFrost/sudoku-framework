@@ -1,11 +1,11 @@
 import { IllegalStateError } from "../../../classes/errors.js";
-import { COL_MASKS, LINE_MASKS, ROW_MASKS } from "../../../constants/bitwise.js";
-import { BOX_OUTSIDE_COLUMN_OF, BOX_OUTSIDE_ROW_OF, BOXES, COLUMN_OUTSIDE_BOX_OF, COLUMNS, HOUSES, ROW_OUTSIDE_BOX_OF, ROWS } from "../../../constants/cordinates.js";
+import { LINE_MASKS } from "../../../constants/bitwise.js";
+import { BOX_OUTSIDE_COLUMN_OF, BOX_OUTSIDE_ROW_OF, COLUMNS, HOUSES, ROWS } from "../../../constants/cordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import { countSetBits, indexToMask, lowestSetIndex, setBitIndices } from "../../../utils/bitwise.js";
 import { candidatesToDigitMasks, getUnit, removeCandidate } from "../../../utils/board.js";
 
-// Pointing pairs helper
+// Claiming helper
 function filterCellCandidates(board: Board, cellIndexes: readonly number[], mask: number): number[] | null {
   const result: number[] = [];
   for (const index of cellIndexes) {
@@ -13,40 +13,6 @@ function filterCellCandidates(board: Board, cellIndexes: readonly number[], mask
     if (!cell.value && (cell.candidates & mask) !== 0) result.push(index);
   }
   return result.length ? result : null;
-}
-
-// Pointing pairs: a digit is confined to one row/column of a box
-function findPointingPairs(board: Board): { remove: readonly number[]; value: number } | null {
-  for (const box of BOXES) {
-    for (const { digit, mask } of candidatesToDigitMasks(board, box)) {
-      const trueIndex = getUnit(box, lowestSetIndex(mask) ?? -1);
-      const digitMask = indexToMask(digit);
-
-      // Rows
-      if (ROW_MASKS.some((m) => (mask & ~m) === 0)) {
-        const rowRemovable = getUnit(ROW_OUTSIDE_BOX_OF, trueIndex);
-        const removable = filterCellCandidates(board, rowRemovable, digitMask);
-        if (removable) return { remove: removable, value: digit };
-      }
-
-      // Cols
-      if (COL_MASKS.some((m) => (mask & ~m) === 0)) {
-        const colRemovable = getUnit(COLUMN_OUTSIDE_BOX_OF, trueIndex);
-        const removable = filterCellCandidates(board, colRemovable, digitMask);
-        if (removable) return { remove: removable, value: digit };
-      }
-    }
-  }
-  return null;
-}
-
-export function solvePointingPairs(board: Board): Board | null {
-  const solution = findPointingPairs(board);
-  if (!solution) return null;
-  const newBoard = [...board];
-  const mask = indexToMask(solution.value);
-  for (const index of solution.remove) newBoard[index] = removeCandidate(board, index, mask);
-  return newBoard;
 }
 
 function findClaiming(board: Board): { remove: readonly number[]; value: number } | null {

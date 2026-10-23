@@ -1,9 +1,8 @@
 // Solvers exported by this are run per-house
 import { IllegalStateError } from "../../../classes/errors.js";
 import type { HOUSES } from "../../../constants/cordinates.js";
-import type { BasicConfig } from "../../../types/algorithms.type.js";
+import type { BasicConfig, SimpleModification } from "../../../types/algorithms.type.js";
 import type { Board, Cell } from "../../../types/board.type.js";
-import type { SimpleModification } from "../../../types/algorithms.type.js";
 import { countSetBits, maskToIndex } from "../../../utils/bitwise.js";
 import { getUnit } from "../../../utils/board.js";
 
@@ -61,8 +60,9 @@ export function findHiddenSinglesInHouse(board: Board, house: House, { first = t
     const value = maskToIndex(intersect);
     if (!value) throw new Error("Hidden single finder reached an illegal state where value is falsy");
 
-    if (first) return [{ value, index }];
-    results.push({ value, index });
+    const result = { value, index };
+    if (first) return [result];
+    results.push(result);
   }
 
   return results.length ? results : null;

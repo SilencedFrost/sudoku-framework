@@ -27,3 +27,11 @@ export function applySimpleModifications(board: Board, modifications: SimpleModi
 
   return newBoard;
 }
+
+// Pointing pairs helper
+export function canEliminateCandidates(board: Board, indexes: readonly number[], mask: number): boolean {
+  return indexes.some((i) => {
+    const cell = getUnit(board, i);
+    return !cell.value && (cell.candidates & mask) !== 0;
+  });
+}
