@@ -1,4 +1,4 @@
-import { BOARD, BOXES, HOUSES, LINES } from "../../../constants/cordinates.js";
+import { BOARD, BOXES, HOUSES, LINES } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import type { BasicConfig, SimpleModification } from "../../../types/algorithms.type.js";
 import { getUnit, removeCandidate } from "../../../utils/board.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROWS } from "../../../constants/cordinates.js";
+import { ROWS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import { getUnit } from "../../../utils/board.js";
 import { indexToMask } from "../../../utils/bitwise.js";

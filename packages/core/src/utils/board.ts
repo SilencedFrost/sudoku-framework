@@ -1,6 +1,6 @@
 import { IllegalStateError } from "../classes/errors.js";
 import { FULL_DIGIT_MASK } from "../constants/bitwise.js";
-import { PEERS } from "../constants/cordinates.js";
+import { PEERS } from "../constants/coordinates.js";
 import type { Board, Cell } from "../types/board.type.js";
 import { indexToMask, isBitSet } from "./bitwise.js";
 

@@ -1,6 +1,6 @@
 // Solvers exported by this are run per-house
 import { IllegalStateError } from "../../../classes/errors.js";
-import type { HOUSES } from "../../../constants/cordinates.js";
+import type { HOUSES } from "../../../constants/coordinates.js";
 import type { BasicConfig, SimpleModification } from "../../../types/algorithms.type.js";
 import type { Board, Cell } from "../../../types/board.type.js";
 import { countSetBits, maskToIndex } from "../../../utils/bitwise.js";
@@ -111,7 +111,7 @@ export function findHiddenSinglesInHouse(board: Board, house: House, { first = t
  *   limit). The `house` parameter is already `readonly number[]`, so a 16-cell
  *   unit needs no signature change, and bits 1..16 fit in the current 32-bit
  *   candidate masks.
- * - Outside this finder, the 9x9 assumptions live in `constants/cordinates.ts`
+ * - Outside this finder, the 9x9 assumptions live in `constants/coordinates.ts`
  *   (ROWS/COLUMNS/BOXES/PEERS), `constants/bitwise.ts` (FULL_DIGIT_MASK and the
  *   row/column/line masks), `utils/bitwise.ts` (resolveCandidates hardcodes 9),
  *   `utils/board.ts` (sanitizeCandidates hardcodes 81 and PEERS;

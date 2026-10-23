@@ -1,6 +1,6 @@
 import { IllegalStateError } from "../../../classes/errors.js";
 import { LINE_MASKS } from "../../../constants/bitwise.js";
-import { BOX_OUTSIDE_COLUMN_OF, BOX_OUTSIDE_ROW_OF, COLUMNS, HOUSES, ROWS } from "../../../constants/cordinates.js";
+import { BOX_OUTSIDE_COLUMN_OF, BOX_OUTSIDE_ROW_OF, COLUMNS, HOUSES, ROWS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import { countSetBits, indexToMask, lowestSetIndex, setBitIndices } from "../../../utils/bitwise.js";
 import { candidatesToDigitMasks, getUnit, removeCandidate } from "../../../utils/board.js";

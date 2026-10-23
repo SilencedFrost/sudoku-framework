@@ -1,4 +1,4 @@
-import { PEERS } from "../../../constants/cordinates.js";
+import { PEERS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import type { SimpleModification } from "../../../types/algorithms.type.js";
 import { indexToMask } from "../../../utils/bitwise.js";

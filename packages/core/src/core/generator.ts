@@ -1,6 +1,6 @@
 import seedrandom from "seedrandom";
 import type { Board, Cell, GeneratedBoard } from "../types/board.type.js";
-import { PEERS } from "../constants/cordinates.js";
+import { PEERS } from "../constants/coordinates.js";
 
 const CELL_COUNT = PEERS.length;
 const DIGIT_COUNT = 9;

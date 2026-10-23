@@ -1,5 +1,5 @@
 import { COL_MASKS, ROW_MASKS } from "../../../constants/bitwise.js";
-import { COLUMN_OUTSIDE_BOX_OF, ROW_OUTSIDE_BOX_OF, type BOXES } from "../../../constants/cordinates.js";
+import { COLUMN_OUTSIDE_BOX_OF, ROW_OUTSIDE_BOX_OF, type BOXES } from "../../../constants/coordinates.js";
 import type { BasicConfig } from "../../../types/algorithms.type.js";
 import type { Board } from "../../../types/board.type.js";
 import { countSetBits, indexToMask, lowestSetIndex } from "../../../utils/bitwise.js";
