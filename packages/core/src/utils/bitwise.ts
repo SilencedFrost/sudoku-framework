@@ -18,7 +18,7 @@ export function isBitSet(mask: number, index: number): boolean {
 
 export function fullMask(n: number): number {
   if (n < 0 || n > 32) throw new RangeError("n must be between 0 and 32");
-  return n === 0 ? 0 : (-1 >>> (32 - n)) | 0;
+  return n === 0 ? 0 : (-1 >>> (32 - n)) | 0; // NOSONAR: intentional uint32 -> int32 coercion
 }
 
 export function countSetBits(mask: number): number {
