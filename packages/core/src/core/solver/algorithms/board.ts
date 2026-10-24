@@ -6,6 +6,7 @@ import { applySimpleModifications } from "./common.js";
 import { findFullHouse, findHiddenSinglesInHouse, findNakedSetsInHouse } from "./house.js";
 import { findNakedSingle } from "./cell.js";
 import { findPointingPairsInBox } from "./box.js";
+import { findClaimingsInLine } from "./line.js";
 
 function findFullHouses(board: Board, { first = true }: BasicConfig = {}): SimpleModification[] | null {
   const results: SimpleModification[] = [];
@@ -72,6 +73,27 @@ function findPointingPairs(board: Board, { first = true }: BasicConfig = {}): { 
 
 export function solvePointingPairs(board: Board, config: BasicConfig = {}): Board | null {
   const results = findPointingPairs(board, config);
+  if (!results) return null;
+  const newBoard = [...board];
+  for (const { remove, mask } of results) {
+    for (const index of remove) newBoard[index] = removeCandidate(newBoard, index, mask);
+  }
+  return newBoard;
+}
+
+function findClaimings(board: Board, { first = true }: BasicConfig = {}): { mask: number; remove: readonly number[] }[] | null {
+  const results: { mask: number; remove: readonly number[] }[] = [];
+  for (const line of LINES) {
+    const result = findClaimingsInLine(board, line, { first });
+    if (!result) continue;
+    if (first) return result;
+    results.push(...result);
+  }
+  return results.length ? results : null;
+}
+
+export function solveClaimings(board: Board, config: BasicConfig = {}): Board | null {
+  const results = findClaimings(board, config);
   if (!results) return null;
   const newBoard = [...board];
   for (const { remove, mask } of results) {
