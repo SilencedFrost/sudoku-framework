@@ -1,8 +1,7 @@
 import { BOARD, BOXES, HOUSES, LINES } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
-import type { BasicConfig, SimpleModification } from "../../../types/algorithms.type.js";
-import { getUnit, removeCandidate } from "../../../utils/board.js";
-import { applySimpleModifications } from "./common.js";
+import type { BasicConfig, CandidateElimination, SimpleModification } from "../../../types/algorithms.type.js";
+import { applyEliminations, applySimpleModifications } from "./common.js";
 import { findFullHouse, findHiddenSinglesInHouse, findNakedSetsInHouse } from "./house.js";
 import { findNakedSingle } from "./cell.js";
 import { findPointingPairsInBox } from "./box.js";
@@ -60,8 +59,8 @@ export function solveNakedSingles(board: Board, config: BasicConfig): Board | nu
   return applySimpleModifications(board, findNakedSingles(board, config));
 }
 
-function findPointingPairs(board: Board, { first = true }: BasicConfig = {}): { mask: number; remove: readonly number[] }[] | null {
-  const results: { mask: number; remove: readonly number[] }[] = [];
+function findPointingPairs(board: Board, { first = true }: BasicConfig = {}): CandidateElimination[] | null {
+  const results: CandidateElimination[] = [];
   for (const box of BOXES) {
     const result = findPointingPairsInBox(board, box, { first });
     if (!result) continue;
@@ -72,17 +71,11 @@ function findPointingPairs(board: Board, { first = true }: BasicConfig = {}): { 
 }
 
 export function solvePointingPairs(board: Board, config: BasicConfig = {}): Board | null {
-  const results = findPointingPairs(board, config);
-  if (!results) return null;
-  const newBoard = [...board];
-  for (const { remove, mask } of results) {
-    for (const index of remove) newBoard[index] = removeCandidate(newBoard, index, mask);
-  }
-  return newBoard;
+  return applyEliminations(board, findPointingPairs(board, config));
 }
 
-function findClaimings(board: Board, { first = true }: BasicConfig = {}): { mask: number; remove: readonly number[] }[] | null {
-  const results: { mask: number; remove: readonly number[] }[] = [];
+function findClaimings(board: Board, { first = true }: BasicConfig = {}): CandidateElimination[] | null {
+  const results: CandidateElimination[] = [];
   for (const line of LINES) {
     const result = findClaimingsInLine(board, line, { first });
     if (!result) continue;
@@ -93,47 +86,21 @@ function findClaimings(board: Board, { first = true }: BasicConfig = {}): { mask
 }
 
 export function solveClaimings(board: Board, config: BasicConfig = {}): Board | null {
-  const results = findClaimings(board, config);
-  if (!results) return null;
-  const newBoard = [...board];
-  for (const { remove, mask } of results) {
-    for (const index of remove) newBoard[index] = removeCandidate(newBoard, index, mask);
-  }
-  return newBoard;
+  return applyEliminations(board, findClaimings(board, config));
 }
 
-function findNakedSets(board: Board, { first = true, size }: BasicConfig & { size?: number } = {}): { masks: number[]; house: (typeof HOUSES)[number] }[] | null {
-  const results: { masks: number[]; house: (typeof HOUSES)[number] }[] = [];
+function findNakedSets(board: Board, { first = true, size }: BasicConfig & { size?: number } = {}): CandidateElimination[] | null {
+  const results: CandidateElimination[] = [];
   for (const house of HOUSES) {
-    const masks = findNakedSetsInHouse(board, house, { first, size });
+    const result = findNakedSetsInHouse(board, house, { first, size });
 
-    if (!masks) continue;
-    const result = { masks, house };
-    if (first) return [result];
-    results.push(result);
+    if (!result) continue;
+    if (first) return result;
+    results.push(...result);
   }
   return results.length ? results : null;
 }
 
 export function solveNakedSets(board: Board, config: BasicConfig & { size?: number } = {}): Board | null {
-  const results = findNakedSets(board, config);
-  if (!results) return null;
-  const newBoard = [...board];
-  for (const { masks, house } of results) {
-    for (const index of house) {
-      const cell = getUnit(newBoard, index);
-      if (cell.value) continue;
-      let toRemove = 0;
-      for (const mask of masks) {
-        // Member of the mask
-        if ((cell.candidates & ~mask) === 0) continue;
-        toRemove |= mask;
-      }
-      if (toRemove) {
-        const newCandidates = cell.candidates & ~toRemove;
-        newBoard[index] = cell.candidates === newCandidates ? cell : { ...cell, candidates: newCandidates };
-      }
-    }
-  }
-  return newBoard;
+  return applyEliminations(board, findNakedSets(board, config));
 }

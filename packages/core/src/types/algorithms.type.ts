@@ -8,6 +8,12 @@ export interface SimpleModification {
   value: number;
 }
 
+// Candidate eliminations return the mask to remove and the cells to remove it from, leaving board creation to the applier
+export interface CandidateElimination {
+  mask: number;
+  remove: readonly number[];
+}
+
 export interface BasicConfig {
   first?: boolean;
 }

@@ -23,7 +23,7 @@ Finder visibility is deliberate: export a finder when tests, a grader, or a hint
 | Naked single (`NakedSingle`) | `findNakedSingle(board, index)` (`cell.ts`) → private `findNakedSingles` | `solveNakedSingles` | An unsolved cell has exactly one candidate. The unit finder returns the digit (or `null`), not a modification. |
 | Pointing pairs/triples (`PointingPairs`) | `findPointingPairsInBox(board, box, config)` (`box.ts`) → private `findPointingPairs` | `solvePointingPairs` | A digit in a box is confined to one row/column, so remove it from the rest of that line. Only digits confined to 2 or 3 box cells qualify. Returns `{ mask, remove }[]`, not a placement. |
 | Claiming (`Claiming`) | private `findClaiming(board)` (`algorithms.ts`) | `solveClaiming` | A digit in a line is confined to one box, so remove it from the rest of that box. Returns `{ remove, value }`. |
-| Naked sets (`NakedPair` / `NakedTriple` / `NakedQuad`) | `findNakedSetsInHouse(board, house, config)` (`house.ts`) → private `findNakedSets` | `solveNakedSets` | `n` cells in a house whose combined candidates are exactly `n` digits form a naked set; remove those digits from other cells in the house. `size` is 2..4. House finder returns union masks; wrapper returns `{ masks, house }[]`. |
+| Naked sets (`NakedPair` / `NakedTriple` / `NakedQuad`) | `findNakedSetsInHouse(board, house, config)` (`house.ts`) → private `findNakedSets` | `solveNakedSets` | `n` cells in a house whose combined candidates are exactly `n` digits form a naked set; remove those digits from other cells in the house. `size` is 2..4. House finder returns `{ mask, remove }[]`; wrapper flattens it. |
 | Hidden pair (`HiddenPair`) | private `findHiddenPair(board)` (`algorithms.ts`) | `solveHiddenPair` | Two digits are confined to the same two cells in a house; those cells cannot hold any other candidates. Returns `{ remove, mask }`. |
 
 File conventions:
@@ -32,7 +32,7 @@ File conventions:
 - `house.ts`: house-scoped finders, mostly `(board, house, config)`; `findFullHouse` takes `(board, house)`. Must not allocate a board copy.
 - `box.ts`: box-scoped finders, `(board, box, config)`.
 - `board.ts`: board-level wrappers and appliers. Each applier lives beside the wrapper that produces its input. Hidden-single wrappers bind to `BOXES` or `LINES`; there is no separate `houses.ts`.
-- `common.ts`: `applySimpleModifications` and `canEliminateCandidates`.
+- `common.ts`: `applySimpleModifications`, `applyEliminations`, and `canEliminateCandidates`.
 - `algorithms.ts`: board-wide pairs that are not naturally unit-scoped (claiming, hidden pair). Their finders are private.
 - Add a new unit file only for a genuinely different search shape (for example `chain` or `fish`), not once per algorithm.
 - Do not leave half a pair in each file: when touching both finder and applier, move the whole pair into the new layout.
@@ -42,10 +42,10 @@ Batching: finders that support it return `X[] | null`; single-pattern finders re
 ## Placements and eliminations
 
 - Placements share `applySimpleModifications(board, modifications | null)`: shallow-copies the board, deduplicates repeated indices (first wins), sets `{ value, candidates: indexToMask(value) }`, and removes the digit from peers against the partially updated copy. Passing `[]` returns a copied board, not `null`; pass `null` to signal "nothing to apply".
-- Eliminations copy the board and call `removeCandidate` or update cells directly. They must read/update the accumulated `newBoard`, so eliminations from several cells or patterns compose instead of overwriting each other against the stale input.
-- Never let an elimination leave a cell with zero candidates; throw `IllegalStateError`.
+- Eliminations share `applyEliminations(board, results | null)` (`common.ts`): returns `null` for `null`, otherwise shallow-copies the board and calls `removeCandidate` for every cell/mask pair against the accumulating copy, so eliminations from several cells or patterns compose instead of overwriting each other against the stale input. Pointing pairs, claiming, and naked sets all use it.
+- Never let an elimination leave a cell with zero candidates; `removeCandidate` (and therefore `applyEliminations`) throws `IllegalStateError`.
 - Use `canEliminateCandidates` to skip patterns that would remove nothing.
-- `SimpleModification` (`{ index, value }`), `BasicConfig` (`{ first?: boolean }`), and `Algorithm` live in `types/algorithms.type.ts`.
+- `SimpleModification` (`{ index, value }`), `CandidateElimination` (`{ mask, remove }`), `BasicConfig` (`{ first?: boolean }`), and `Algorithm` live in `types/algorithms.type.ts`.
 
 ## `solveStep` and `solveAll`
 
@@ -84,8 +84,9 @@ Order (first success wins):
 ## Pitfalls
 
 - `solveNakedSets` accepts `size` 2..4. The default search (no `size`) mixes sizes and reports a maximal collection of disjoint sets; solver wiring must pass an explicit size so the returned `alg` matches the deduction.
-- `findNakedSetsInHouse` throws `RangeError` for `size` outside 2..4. Its default search is capped at `floor(unsolved / 2)` (at most 4 in a 9-cell house), so it can miss a larger usable set in a nearly full house. A forced size does not consume smaller sizes first: size 3 relies on bivalue/pair pre-exclusion for minimality, and size 4 additionally rejects sets in which a digit is held by only one member. Its `first` default is `false` (unlike the other config-taking unit finders), so it may return several masks; wrappers pass `first` explicitly.
+- `findNakedSetsInHouse` throws `RangeError` for `size` outside 2..4. Its default search is capped at `floor(unsolved / 2)` (at most 4 in a 9-cell house), so it can miss a larger usable set in a nearly full house. A forced size does not consume smaller sizes first: size 3 relies on bivalue/pair pre-exclusion for minimality, and size 4 additionally rejects sets in which a digit is held by only one member. Its `first` default is `false` (unlike the other config-taking unit finders), so it may return several eliminations; wrappers pass `first` explicitly.
 - `findPointingPairsInBox` only accepts digits confined to 2 or 3 box cells, so it covers pointing pairs and triples. Its `remove` list is the whole outside-box line, not just cells that currently hold the digit; the applier relies on `removeCandidate` returning solved/clean cells unchanged, and `canEliminateCandidates` prevents reporting a pattern that would eliminate nothing.
+- `findNakedSetsInHouse` returns `{ mask, remove }[]`. Its `remove` list is every non-member unsolved cell in the house, including cells that currently hold none of the digits; set members are excluded and `hasElimination` prevents reporting a set that eliminates nothing. The applier shares `applyEliminations` with pointing pairs and claiming.
 - `solveNakedSingles(board, config)` requires an explicit config (unlike the other config-taking appliers); pass `{}` or `{ first: ... }`.
 - `findHiddenSinglesInHouse` still throws a plain `Error` when `maskToIndex` returns null. That is an internal invariant check, not user-facing validation.
 - `solveStep` returns after the first successful algorithm. A grader needing the applied step must loop `solveStep` itself; `solveAll` only returns the final board.

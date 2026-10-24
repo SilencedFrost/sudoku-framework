@@ -82,8 +82,8 @@ describe("findNakedSetsInHouse", () => {
     const board = boardFromHouse([bits(1, 2, 4), bits(1, 2), bits(1, 3), bits(2, 3), bits(4, 5), bits(1, 5), null, null, null]);
 
     const result = findNakedSetsInHouse(board, house, { size: 4 });
-    expect(result ?? []).not.toContain(bits(1, 2, 3, 4));
-    for (const mask of result ?? []) expect(isMinimal(board, mask, 4)).toBe(true);
+    expect((result ?? []).map(({ mask }) => mask)).not.toContain(bits(1, 2, 3, 4));
+    for (const { mask } of result ?? []) expect(isMinimal(board, mask, 4)).toBe(true);
   });
 
   it("returns only minimal sets when size 4 is forced", () => {
@@ -92,13 +92,13 @@ describe("findNakedSetsInHouse", () => {
 
     for (let trial = 0; trial < 2000; trial++) {
       const board = randomBoard(random, randomMask);
-      let found: number[] | null;
+      let found: ReturnType<typeof findNakedSetsInHouse>;
       try {
         found = findNakedSetsInHouse(board, house, { size: 4 });
       } catch {
         continue; // overfilled house: not relevant to this check
       }
-      for (const mask of found ?? []) {
+      for (const { mask } of found ?? []) {
         if (!isMinimal(board, mask, 4)) violations.push(`trial=${trial.toString()} mask=${mask.toString(2)}`);
       }
     }
@@ -112,18 +112,34 @@ describe("findNakedSetsInHouse", () => {
 
     for (let trial = 0; trial < 2000; trial++) {
       const board = randomBoard(random, randomMask);
-      let found: number[] | null;
+      let found: ReturnType<typeof findNakedSetsInHouse>;
       try {
         found = findNakedSetsInHouse(board, house);
       } catch {
         continue;
       }
-      for (const mask of found ?? []) {
+      for (const { mask } of found ?? []) {
         const size = popcount(mask);
         if (!isMinimal(board, mask, size)) violations.push(`trial=${trial.toString()} mask=${mask.toString(2)} size=${size.toString()}`);
       }
     }
 
     expect(violations).toEqual([]);
+  });
+
+  it("reports every non-member unsolved cell as a removal target", () => {
+    // Pair {1,2} in cells 0-1. Cell 2 shares 1, cell 3 shares nothing but is
+    // still a target, mirroring the pointing/claiming target lists.
+    const board = boardFromHouse([bits(1, 2), bits(1, 2), bits(1, 3), bits(3, 4), null, null, null, null, null]);
+
+    const result = findNakedSetsInHouse(board, house, { size: 2 });
+
+    expect(result).toEqual([{ mask: bits(1, 2), remove: [getUnit(house, 2), getUnit(house, 3)] }]);
+  });
+
+  it("skips a set that eliminates nothing", () => {
+    const board = boardFromHouse([bits(1, 2), bits(1, 2), bits(3, 4), bits(4, 5), null, null, null, null, null]);
+
+    expect(findNakedSetsInHouse(board, house, { size: 2 })).toBeNull();
   });
 });

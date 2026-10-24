@@ -15,9 +15,10 @@ packages/core/src/
         board.ts            # board-level wrappers/appliers
         box.ts              # box-scoped finder: pointing pairs/triples
         cell.ts             # cell-scoped finder: naked single
-        common.ts           # applySimpleModifications + canEliminateCandidates
+        common.ts           # applySimpleModifications + applyEliminations + canEliminateCandidates
         house.ts            # house-scoped finders: full house, hidden single, naked sets
         common.test.ts      # batch/dedup applier tests
+        board.test.ts       # elimination applier tests
         house.test.ts       # naked-set finder tests
     generator.ts            # newBoard(hints, seed?): generated boards with known solutions
   constants/
@@ -27,7 +28,7 @@ packages/core/src/
     algorithms.ts           # ALGORITHM_SCORE registry + difficulty ordering
   types/
     board.type.ts           # Cell, Board, GeneratedBoard
-    algorithms.type.ts      # Algorithm, SimpleModification, BasicConfig
+    algorithms.type.ts      # Algorithm, SimpleModification, CandidateElimination, BasicConfig
     common.type.ts          # Tuple
   classes/errors.ts         # IllegalStateError + error-code registry
   utils/

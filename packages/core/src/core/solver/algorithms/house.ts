@@ -1,7 +1,7 @@
 // Solvers exported by this are run per-house
 import { IllegalStateError } from "../../../classes/errors.js";
 import type { HOUSES } from "../../../constants/coordinates.js";
-import type { BasicConfig, SimpleModification } from "../../../types/algorithms.type.js";
+import type { BasicConfig, CandidateElimination, SimpleModification } from "../../../types/algorithms.type.js";
 import type { Board, Cell } from "../../../types/board.type.js";
 import { countSetBits, maskToIndex } from "../../../utils/bitwise.js";
 import { getUnit } from "../../../utils/board.js";
@@ -75,10 +75,13 @@ export function findHiddenSinglesInHouse(board: Board, house: House, { first = t
  * other unsolved cell in the same house. Sets that eliminate nothing are
  * skipped.
  *
- * Results are union masks, not cell lists. The members are the cells whose
- * candidates fit inside the mask, so the caller can recover them if it needs
- * them. Keeping the finder mask-only makes it as cheap as possible: it marks a
- * union as soon as it is actionable and leaves everything else to the caller.
+ * Results pair each usable set's union mask with its removal targets: every
+ * unsolved cell in the house that is not a member of the set. That is the whole
+ * target set, not only cells that currently share a digit - the applier relies
+ * on `removeCandidate` no-opping on clean cells. Members (candidates fully
+ * inside the mask) and solved cells are never targets. Keeping the finder to
+ * masks plus targets makes it as cheap as possible: it marks a union as soon as
+ * it is actionable and leaves board creation to the caller.
  *
  * - Default (no `size`): search every size k up to floor(unsolved / 2) and
  *   return every usable set found. Once cells are used by a set they leave the
@@ -117,7 +120,7 @@ export function findHiddenSinglesInHouse(board: Board, house: House, { first = t
  *   `utils/board.ts` (sanitizeCandidates hardcodes 81 and PEERS;
  *   candidatesToDigitMasks loops 1..9), and `core/generator.ts`.
  */
-export function findNakedSetsInHouse(board: Board, house: House, { size: n, first = false }: BasicConfig & { size?: number | undefined } = {}): number[] | null {
+export function findNakedSetsInHouse(board: Board, house: House, { size: n, first = false }: BasicConfig & { size?: number | undefined } = {}): CandidateElimination[] | null {
   if (n !== undefined && (n < 2 || n > 4)) throw new RangeError(`findNakedSets does not support n=${n.toString()}`);
 
   const unsolvedCells: Cell[] = [];
@@ -136,6 +139,18 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
   // unsolved cell, not just the working pool, because cells already consumed
   // or pruned can still be elimination targets.
   const hasElimination = (unionMask: number): boolean => unsolvedCells.some((c) => (c.candidates & unionMask) !== 0 && (c.candidates & ~unionMask) !== 0);
+
+  // Every unsolved cell that is not a member of the set is a target. Cells
+  // holding none of the digits are included too, mirroring the pointing and
+  // claiming finders; `removeCandidate` leaves them unchanged.
+  const collectTargets = (unionMask: number): number[] => {
+    const targets: number[] = [];
+    for (const index of house) {
+      const cell = getUnit(board, index);
+      if (!cell.value && (cell.candidates & ~unionMask) !== 0) targets.push(index);
+    }
+    return targets;
+  };
 
   // A k-cell set can only absorb k digits. If more than k cells are confined
   // to those digits, the house can never be filled and the board is broken.
@@ -160,7 +175,7 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
     usableMasks.push(cell.candidates);
   }
 
-  const results: number[] = [];
+  const results: CandidateElimination[] = [];
 
   for (const [mask, count] of bivalueCount) {
     // Two digits may only be confined to exactly two cells. This also catches
@@ -177,8 +192,9 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
     // set can never absorb it, which keeps the results minimal. Report it only
     // when pairs were requested (no size given, or size 2).
     if (!(nClamp === 2 && hasElimination(mask))) continue;
-    if (first) return [mask];
-    results.push(mask);
+    const elimination = { mask, remove: collectTargets(mask) };
+    if (first) return [elimination];
+    results.push(elimination);
   }
 
   // If size 2 was the whole request, we are done.
@@ -264,8 +280,9 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
       assertNotOverfilled(unionMask, k);
 
       if (!hasElimination(unionMask)) continue;
-      if (first) return [unionMask];
-      results.push(unionMask);
+      const elimination = { mask: unionMask, remove: collectTargets(unionMask) };
+      if (first) return [elimination];
+      results.push(elimination);
     }
   }
 
