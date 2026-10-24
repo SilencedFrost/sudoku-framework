@@ -1,5 +1,5 @@
 import { LINE_MASKS } from "../../../constants/bitwise.js";
-import { BOX_OUTSIDE_ROW_OF, COLUMN_OUTSIDE_BOX_OF, type LINES } from "../../../constants/coordinates.js";
+import { BOX_OUTSIDE_COLUMN_OF, BOX_OUTSIDE_ROW_OF, type LINES } from "../../../constants/coordinates.js";
 import type { BasicConfig, CandidateElimination } from "../../../types/algorithms.type.js";
 import type { Board } from "../../../types/board.type.js";
 import { countSetBits, indexToMask, lowestSetIndex } from "../../../utils/bitwise.js";
@@ -18,7 +18,7 @@ export function findClaimingsInLine(board: Board, line: Line, { first = true }: 
     const trueIndex = getUnit(line, lowestSetIndex(mask) ?? -1);
 
     if (LINE_MASKS.some((m) => (mask & ~m) === 0)) {
-      const targetCells = getUnit(isRow(line) ? BOX_OUTSIDE_ROW_OF : COLUMN_OUTSIDE_BOX_OF, trueIndex);
+      const targetCells = getUnit(isRow(line) ? BOX_OUTSIDE_ROW_OF : BOX_OUTSIDE_COLUMN_OF, trueIndex);
       const digitMask = indexToMask(digit);
       if (!canEliminateCandidates(board, targetCells, digitMask)) continue;
       const result = { remove: targetCells, mask: digitMask };
