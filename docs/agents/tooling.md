@@ -44,3 +44,4 @@ packages/core/src/
 - Root `tsconfig.json` only covers `eslint.config.ts`; `pnpm typecheck` recurses per package.
 - `knip.ts` only configures `packages/core`; new packages may need their own Knip workspace entries.
 - The public API is only what `packages/core/src/index.ts` exports. Reflect public API changes there.
+- `@sudoku/core` ships unbundled per-module `tsc` output on purpose (tree-shaking, chunk splitting). Bundling/minify/inlining experiments and their measurements live in [`performance.md`](performance.md).

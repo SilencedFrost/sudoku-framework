@@ -51,5 +51,6 @@ Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before finishing.
 | Difficulty rating or grader contracts                           | [`docs/agents/grader.md`](docs/agents/grader.md)       |
 | Tests and coverage expectations                                 | [`docs/agents/testing.md`](docs/agents/testing.md)     |
 | Build config, workspace, repo layout, tooling                   | [`docs/agents/tooling.md`](docs/agents/tooling.md)     |
+| Throughput benchmarks, profiling, packaging against speed       | [`performance.md`](docs/agents/performance.md)         |
 
 When behavior changes, update the matching domain doc. Keep this file short; details belong in `docs/agents/`.

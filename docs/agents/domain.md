@@ -26,6 +26,7 @@ Load when changing board shape, candidate masks, constants, errors, or `utils/`.
 - `constants/algorithms.ts`: `ALGORITHM_SCORE` is the single registry of algorithm names and difficulty scores; the `Algorithm` type is derived from its keys.
 - `constants/board.ts`: `UNIT_SIZE`, `HOUSE_SIZE`.
 - Unit/peer constants are precomputed at module load; prefer them over recomputing row/column/box math. `BOARD` is also the board-level naked-single scan order.
+- These lists stay plain `number[]`: `Uint8Array` was measured and is 5–7% slower in the solver's loops. See [`performance.md`](performance.md) before changing their representation.
 
 ## Pitfalls
 
