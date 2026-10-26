@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { IllegalStateError } from "../../../classes/errors.js";
+import { FULL_DIGIT_MASK } from "../../../constants/bitwise.js";
 import { ROWS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import { getUnit } from "../../../utils/board.js";
-import { indexToMask } from "../../../utils/bitwise.js";
-import { findNakedSetsInHouse } from "./house.js";
+import { indexToMask, setBitIndices } from "../../../utils/bitwise.js";
+import { applyEliminations } from "./common.js";
+import { findHiddenSetsInHouse, findNakedSetsInHouse } from "./house.js";
 
 const house = getUnit(ROWS, 0);
 
@@ -17,6 +20,7 @@ const popcount = (mask: number): number => {
 };
 
 const bits = (...digits: number[]): number => digits.reduce((mask, digit) => mask | indexToMask(digit), 0);
+const outside = (...digits: number[]): number => FULL_DIGIT_MASK & ~bits(...digits);
 
 const boardFromHouse = (masks: (number | null)[]): Board => {
   const board: Board = Array.from({ length: 81 }, () => ({ value: 9, candidates: indexToMask(9) }));
@@ -48,6 +52,33 @@ const isMinimal = (board: Board, mask: number, k: number): boolean => {
       if (position !== omit) union |= getUnit(board, index).candidates;
     });
     if (popcount(union) !== k) return false;
+  }
+  return true;
+};
+
+// House-relative position mask of every unsolved cell that can still hold `digit`.
+const positionsOf = (board: Board, digit: number): number => {
+  const digitMask = indexToMask(digit);
+  let positions = 0;
+  house.forEach((index, offset) => {
+    const cell = getUnit(board, index);
+    if (!cell.value && (cell.candidates & digitMask) !== 0) positions |= 1 << offset;
+  });
+  return positions;
+};
+
+// A hidden set is minimal when no proper non-empty digit subset is itself hidden.
+const isMinimalHidden = (board: Board, mask: number): boolean => {
+  const digits = setBitIndices(mask);
+  for (let subset = 1; subset < (1 << digits.length) - 1; subset++) {
+    let union = 0;
+    let size = 0;
+    digits.forEach((digit, position) => {
+      if ((subset & (1 << position)) === 0) return;
+      size++;
+      union |= positionsOf(board, digit);
+    });
+    if (popcount(union) === size) return false;
   }
   return true;
 };
@@ -141,5 +172,104 @@ describe("findNakedSetsInHouse", () => {
     const board = boardFromHouse([bits(1, 2), bits(1, 2), bits(3, 4), bits(4, 5), null, null, null, null, null]);
 
     expect(findNakedSetsInHouse(board, house, { size: 2 })).toBeNull();
+  });
+});
+
+describe("findHiddenSetsInHouse", () => {
+  it("reports a hidden pair and its member cells", () => {
+    // 1 and 2 only appear in cells 0-1, so those cells cannot hold 3 or 4.
+    const board = boardFromHouse([bits(1, 2, 3), bits(1, 2, 4), bits(3, 4, 5), bits(3, 4, 5), null, null, null, null, null]);
+
+    expect(findHiddenSetsInHouse(board, house, { size: 2 })).toEqual([{ mask: outside(1, 2), remove: [getUnit(house, 0), getUnit(house, 1)] }]);
+  });
+
+  it("returns a removal mask that applyEliminations can use directly", () => {
+    const board = boardFromHouse([bits(1, 2, 3), bits(1, 2, 4), bits(3, 4, 5), bits(3, 4, 5), null, null, null, null, null]);
+    const applied = applyEliminations(board, findHiddenSetsInHouse(board, house, { size: 2 }));
+
+    expect(applied).not.toBeNull();
+    expect(getUnit(applied ?? board, getUnit(house, 0)).candidates).toBe(bits(1, 2));
+    expect(getUnit(applied ?? board, getUnit(house, 1)).candidates).toBe(bits(1, 2));
+    // Non-members are untouched.
+    expect(getUnit(applied ?? board, getUnit(house, 2)).candidates).toBe(bits(3, 4, 5));
+  });
+
+  it("reports a hidden triple whose digits use different position masks", () => {
+    // 1 -> {0,1}, 2 -> {1,2}, 3 -> {0,2}; together they use only cells 0-2.
+    const board = boardFromHouse([
+      bits(1, 3, 4),
+      bits(1, 2, 5),
+      bits(2, 3, 6),
+      bits(4, 5, 6),
+      bits(4, 5),
+      bits(4, 6),
+      null,
+      null,
+      null,
+    ]);
+
+    expect(findHiddenSetsInHouse(board, house, { size: 3, first: true })).toEqual([
+      { mask: outside(1, 2, 3), remove: [getUnit(house, 0), getUnit(house, 1), getUnit(house, 2)] },
+    ]);
+  });
+
+  it("reports a hidden quad when every member cell stays covered", () => {
+    // 1 -> {0,1}, 2 -> {0,2}, 3 -> {1,3}, 4 -> {2,3}: each cell is covered twice.
+    const board = boardFromHouse([bits(1, 2, 5), bits(1, 3), bits(2, 4), bits(3, 4), bits(5), null, null, null, null]);
+
+    expect(findHiddenSetsInHouse(board, house, { size: 4 })).toEqual([
+      { mask: outside(1, 2, 3, 4), remove: [getUnit(house, 0), getUnit(house, 1), getUnit(house, 2), getUnit(house, 3)] },
+    ]);
+  });
+
+  it("does not report a size-4 set that contains a size-3 set", () => {
+    // 1,2,3 form a hidden triple in cells 0-2; 4 adds cell 3, but cell 3 is
+    // covered only by 4, so dropping 4 leaves the triple behind.
+    const board = boardFromHouse([bits(1, 2), bits(1, 3), bits(2, 3, 4), bits(4, 5), bits(5), null, null, null, null]);
+
+    expect(findHiddenSetsInHouse(board, house, { size: 4 })).toBeNull();
+  });
+
+  it("skips a set that eliminates nothing", () => {
+    // Both pairs already sit in cells whose candidates are exactly the set.
+    const board = boardFromHouse([bits(1, 2), bits(1, 2), bits(3, 4), bits(3, 4), null, null, null, null, null]);
+
+    expect(findHiddenSetsInHouse(board, house, { size: 2 })).toBeNull();
+  });
+
+  it("throws when three digits share the same pair of cells", () => {
+    const board = boardFromHouse([bits(1, 2, 3), bits(1, 2, 3), null, null, null, null, null, null, null]);
+
+    expect(() => findHiddenSetsInHouse(board, house, { size: 2 })).toThrow(IllegalStateError);
+  });
+
+  it("returns only minimal sets", () => {
+    const { random, randomMask } = seededRandom(246813579);
+    const violations: string[] = [];
+    let foundCount = 0;
+
+    for (let trial = 0; trial < 2000; trial++) {
+      const board = randomBoard(random, randomMask);
+      let found: ReturnType<typeof findHiddenSetsInHouse>;
+      try {
+        found = findHiddenSetsInHouse(board, house);
+      } catch {
+        continue; // overfilled house: not relevant to this check
+      }
+      foundCount += found?.length ?? 0;
+      for (const { mask, remove } of found ?? []) {
+        const digitMask = FULL_DIGIT_MASK & ~mask;
+        const digits = setBitIndices(digitMask);
+        const union = digits.reduce((acc, digit) => acc | positionsOf(board, digit), 0);
+        const expectedRemove = setBitIndices(union).map((position) => getUnit(house, position));
+        const removeMatches = remove.length === expectedRemove.length && remove.every((index, position) => index === expectedRemove[position]);
+        if (popcount(union) !== digits.length || !removeMatches || !isMinimalHidden(board, digitMask)) {
+          violations.push(`trial=${trial.toString()} mask=${mask.toString(2)}`);
+        }
+      }
+    }
+
+    expect(foundCount).toBeGreaterThan(0);
+    expect(violations).toEqual([]);
   });
 });

@@ -1,10 +1,12 @@
 // Solvers exported by this are run per-house
 import { IllegalStateError } from "../../../classes/errors.js";
+import { FULL_DIGIT_MASK } from "../../../constants/bitwise.js";
 import type { HOUSES } from "../../../constants/coordinates.js";
 import type { BasicConfig, CandidateElimination, SimpleModification } from "../../../types/algorithms.type.js";
 import type { Board, Cell } from "../../../types/board.type.js";
-import { countSetBits, maskToIndex } from "../../../utils/bitwise.js";
-import { getUnit } from "../../../utils/board.js";
+import { countSetBits, indexToMask, maskToIndex, setBitIndices } from "../../../utils/bitwise.js";
+import { candidatesToDigitMasks, getUnit } from "../../../utils/board.js";
+import { canEliminateCandidates } from "./common.js";
 
 type House = (typeof HOUSES)[number];
 
@@ -135,11 +137,6 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
 
   const nLimit: number = n ?? Math.max(Math.floor(unsolved / 2), 2);
 
-  // Shared by the pair path and the larger-set path. We check against every
-  // unsolved cell, not just the working pool, because cells already consumed
-  // or pruned can still be elimination targets.
-  const hasElimination = (unionMask: number): boolean => unsolvedCells.some((c) => (c.candidates & unionMask) !== 0 && (c.candidates & ~unionMask) !== 0);
-
   // Every unsolved cell that is not a member of the set is a target. Cells
   // holding none of the digits are included too, mirroring the pointing and
   // claiming finders; `removeCandidate` leaves them unchanged.
@@ -151,6 +148,11 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
     }
     return targets;
   };
+
+  // Shared by the pair path and the larger-set path. Targets are every
+  // unsolved cell outside the set, including cells already consumed or pruned
+  // from the working pool, so a shared digit means the set can remove it.
+  const hasElimination = (unionMask: number): boolean => canEliminateCandidates(board, collectTargets(unionMask), unionMask);
 
   // A k-cell set can only absorb k digits. If more than k cells are confined
   // to those digits, the house can never be filled and the board is broken.
@@ -281,6 +283,221 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
 
       if (!hasElimination(unionMask)) continue;
       const elimination = { mask: unionMask, remove: collectTargets(unionMask) };
+      if (first) return [elimination];
+      results.push(elimination);
+    }
+  }
+
+  return results.length > 0 ? results : null;
+}
+
+/**
+ * Find hidden sets inside one house.
+ *
+ * A hidden set is `n` digits that can only occupy the same `n` unsolved cells
+ * in a house. Those cells can then drop every candidate outside the set, so a
+ * usable set removes the non-set candidates from its member cells. Results
+ * pair that removal mask - every candidate outside the set - with the member
+ * cells, matching `CandidateElimination` and `applyEliminations`. Clean members
+ * are included because the applier no-ops on them.
+ *
+ * This is the digit-side dual of `findNakedSetsInHouse`. Instead of cells and
+ * their candidate masks, the search works on each eligible digit's position
+ * mask (the house-relative cells that can still hold it): a hidden set is `n`
+ * position masks whose union spans exactly `n` cells.
+ *
+ * - Default (no `size`): search every size k up to `min(unsolved, 4)` and
+ *   return every usable set found. Smaller sizes are consumed first, and once
+ *   digits are used by a set they leave the pool, so overlapping alternatives
+ *   are not enumerated - the result is a maximal collection of digit-disjoint
+ *   minimal sets. The cap is the supported algorithm limit; larger sizes need
+ *   a full proper-subset check. Pass `size` to force a size.
+ * - `size: n`: return usable sets of size n only. Smaller sizes are not
+ *   searched first. Pairs are pre-excluded from the pool; for n = 4 a set is
+ *   additionally rejected unless every member cell stays covered after
+ *   dropping any one digit, which rules out an enclosed triple.
+ * - `first: true`: stop at the first usable set and return it.
+ * - Returns `null` when no usable set matches the request.
+ * - Throws `IllegalStateError` when more than `n` digits are confined to a
+ *   found set's `n` cells (e.g. three digits sharing the same pair of cells).
+ *
+ * Generalization notes mirror `findNakedSetsInHouse`: only `size` 2..4 is
+ * accepted, and a 16-cell house would need the guard raised to
+ * `floor(house.length / 2)` plus a full proper-subset check for n >= 5 (a
+ * 5-set can contain a hidden triple while every cell is still covered twice).
+ */
+export function findHiddenSetsInHouse(board: Board, house: House, { size: n, first = false }: BasicConfig & { size?: number | undefined } = {}): CandidateElimination[] | null {
+  if (n !== undefined && (n < 2 || n > 4)) throw new RangeError(`findHiddenSets does not support n=${n.toString()}`);
+
+  let unsolved = 0;
+  for (const index of house) {
+    if (!getUnit(board, index).value) unsolved++;
+  }
+
+  const nClamp = n ?? 2; // smallest size we are allowed to report: n, or 2 when no size was asked for
+  if (unsolved < nClamp) return null;
+
+  const nLimit: number = n ?? Math.min(unsolved, 4);
+
+  // A digit's mask is the set of house-relative positions that can still hold
+  // it. Digits already placed in the house are omitted by the generator.
+  const digitMasks: { digit: number; mask: number }[] = [];
+  for (const { digit, mask } of candidatesToDigitMasks(board, house)) {
+    // No position means the house is already contradictory; it is not a set.
+    if (mask === 0) continue;
+    digitMasks.push({ digit, mask });
+  }
+
+  const membersOf = (unionMask: number): number[] => setBitIndices(unionMask).map((position) => getUnit(house, position));
+  const outsideOf = (digitMask: number): number => FULL_DIGIT_MASK & ~digitMask;
+
+  // Shared by the pair path and the larger-set path. A hidden set removes the
+  // candidates outside its digit mask from every member cell.
+  const hasElimination = (unionMask: number, removeMask: number): boolean => canEliminateCandidates(board, membersOf(unionMask), removeMask);
+
+  // A k-digit hidden set can only live in k cells. If more than k digits are
+  // confined to those cells, the house can never be filled and the board is
+  // broken. We only run this on unions the search actually produced, so it
+  // stays cheap.
+  const assertNotOverfilled = (unionMask: number, size: number): void => {
+    let enclosed = 0;
+    for (const { mask } of digitMasks) if ((mask & ~unionMask) === 0) enclosed++;
+    if (enclosed > size) throw new IllegalStateError(IllegalStateError.Code.ILLEGAL_HIDDEN_COUNT, enclosed);
+  };
+
+  // --- Collect candidates: digits confined to exactly two cells are counted by position mask, all other digits go straight into the pool ---
+  let usableDigits: { digit: number; mask: number }[] = [];
+  const pairDigits = new Map<number, number[]>();
+
+  for (const entry of digitMasks) {
+    const bits = countSetBits(entry.mask);
+    // <2 means a hidden single, >nLimit cannot fit in a supported set.
+    if (bits < 2 || bits > nLimit) continue;
+    if (bits === 2) {
+      const digits = pairDigits.get(entry.mask);
+      if (digits) {
+        digits.push(entry.digit);
+      } else {
+        pairDigits.set(entry.mask, [entry.digit]);
+      }
+      continue; // decided below: a pair-position digit joins the pool only if it appears exactly once
+    }
+    usableDigits.push(entry);
+  }
+
+  const results: CandidateElimination[] = [];
+
+  for (const [mask, digits] of pairDigits) {
+    // Two digits may only be confined to exactly two cells. This catches the
+    // three-identical-pair-mask case and lone pair-position digits too.
+    assertNotOverfilled(mask, 2);
+
+    // Seen once: keep it as a normal candidate for sets of size 3 or more.
+    if (digits.length === 1) {
+      usableDigits.push({ digit: getUnit(digits, 0), mask });
+      continue;
+    }
+    // Seen twice: this is a hidden pair. Keep both digits out of the pool so a
+    // larger set can never absorb them, which keeps the results minimal.
+    // Report it only when pairs were requested (no size given, or size 2).
+    if (nClamp !== 2) continue;
+    const digitMask = digits.reduce((acc, digit) => acc | indexToMask(digit), 0);
+    const removeMask = outsideOf(digitMask);
+    if (!hasElimination(mask, removeMask)) continue;
+    const elimination = { mask: removeMask, remove: membersOf(mask) };
+    if (first) return [elimination];
+    results.push(elimination);
+  }
+
+  // If size 2 was the whole request, we are done.
+  if (n === 2) return results.length > 0 ? results : null;
+
+  // Pairs are finished. Without a forced size, start at 3 and consume smaller
+  // sizes so reported sets stay minimal. With a forced size, skip straight to
+  // it and enforce minimality in `findSubset` instead.
+  const SEARCH_START = n ?? 3;
+  if (nLimit < SEARCH_START) return results.length > 0 ? results : null;
+
+  // Only forced sizes above 3 skip the smaller consume passes, so only they
+  // need the explicit minimality checks in `findSubset`. The default path (and
+  // size 3) already gets minimality from pair exclusion plus consuming every
+  // smaller size before trying a larger one.
+  const enforceMinimality = SEARCH_START > 3;
+
+  // --- Prune until nothing changes ---
+  // A digit occupying a cell no other digit can occupy cannot be part of a
+  // minimal hidden set: dropping that digit would leave a smaller set behind.
+  let twice = 0;
+  let prevLength: number;
+  do {
+    if (usableDigits.length < SEARCH_START) return results.length > 0 ? results : null;
+    prevLength = usableDigits.length;
+
+    let once = 0;
+    twice = 0;
+    for (const { mask } of usableDigits) {
+      twice |= once & mask;
+      once |= mask;
+    }
+    usableDigits = usableDigits.filter(({ mask }) => (mask & ~twice) === 0);
+  } while (usableDigits.length !== prevLength);
+
+  if (countSetBits(twice) < SEARCH_START) return results.length > 0 ? results : null;
+
+  // --- Recursive search: pick k digit masks whose union spans exactly k cells ---
+  const findSubset = (pool: { digit: number; mask: number }[], k: number, start = 0, picked: number[] = [], union = 0): number[] | null => {
+    if (picked.length === k) {
+      if (countSetBits(union) !== k) return null;
+      if (!enforceMinimality) return picked;
+
+      // Minimality: every cell must stay covered after dropping any one digit,
+      // so neither the set nor any (k-1)-subset has a smaller hidden set.
+      let seen = 0;
+      let seenTwice = 0;
+      for (const index of picked) {
+        const mask = pool[index]?.mask ?? 0;
+        seenTwice |= seen & mask;
+        seen |= mask;
+      }
+      return seenTwice === union ? picked : null;
+    }
+
+    // Early prune: dropping one digit from a minimal k-set must not lose a
+    // cell, so a (k-1)-prefix still has to span all k cells.
+    if (enforceMinimality && picked.length === k - 1 && countSetBits(union) !== k) return null;
+    if (pool.length - start < k - picked.length) return null;
+
+    for (let i = start; i < pool.length; i++) {
+      const nextUnion = union | (pool[i]?.mask ?? 0);
+      if (countSetBits(nextUnion) > k) continue;
+      const found = findSubset(pool, k, i + 1, [...picked, i], nextUnion);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  // With no forced size this runs 3..nLimit; with a forced size it runs only n.
+  for (let k = SEARCH_START; k <= nLimit; k++) {
+    let indices: number[] | null;
+    while (usableDigits.length >= k && (indices = findSubset(usableDigits, k)) !== null) {
+      const picked = new Set(indices);
+
+      let unionMask = 0;
+      let digitMask = 0;
+      for (const index of indices) {
+        const entry = usableDigits[index];
+        if (!entry) continue;
+        unionMask |= entry.mask;
+        digitMask |= indexToMask(entry.digit);
+      }
+
+      usableDigits = usableDigits.filter((_, i) => !picked.has(i)); // a digit belongs to only one hidden set
+
+      assertNotOverfilled(unionMask, k);
+
+      const removeMask = outsideOf(digitMask);
+      if (!hasElimination(unionMask, removeMask)) continue;
+      const elimination = { mask: removeMask, remove: membersOf(unionMask) };
       if (first) return [elimination];
       results.push(elimination);
     }
