@@ -4,7 +4,7 @@ Load when adding or updating tests.
 
 ## Conventions
 
-- Vitest tests are colocated as `src/**/*.test.ts` and excluded from the build.
+- Vitest tests are colocated as `src/**/*.test.ts` and excluded from the build. Shared test builders (`bits`, `boardWith`, `solved`, `unsolved`) live in `algorithms/test-utils.ts`, which is also excluded from the build.
 - Prefer table-driven `it.each` with explicit expected values (see `utils/bitwise.test.ts`).
 - Test finder and applier separately:
   - Finders: `null` on absent patterns and concrete masks/indices.
@@ -19,9 +19,11 @@ Load when adding or updating tests.
 - `utils/bitwise.test.ts`
 - `algorithms/common.test.ts` (batch applier/dedup/immutability)
 - `algorithms/house.test.ts` (naked- and hidden-set minimality, including randomized cases)
+- `algorithms/box.test.ts` (pointing pairs/triples)
+- `algorithms/line.test.ts` (claiming, row and column directions)
 - `algorithms/board.test.ts` (naked- and hidden-set board wrappers/appliers)
 
-Gaps: `canEliminateCandidates` is untested, and there is no `cell.test.ts`, `box.test.ts`, `solver.test.ts`, or generator test yet. Add those when touching the corresponding code.
+Gaps: `canEliminateCandidates` is untested, and there is no `cell.test.ts`, `solver.test.ts`, or generator test yet. Add those when touching the corresponding code.
 
 ## Commands
 

@@ -16,8 +16,7 @@ export function sanitizeCandidates(board: Board, rebuild = false): Board {
 
   for (let i = 0; i < 81; i++) {
     // Get peer indices
-    const peers = PEERS[i];
-    if (!peers) throw new RangeError(`Peers is falsy with index ${i.toString()}`);
+    const peers = getUnit(PEERS, i);
 
     // Extract cell data
     const cell = getUnit(board, i);

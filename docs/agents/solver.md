@@ -33,7 +33,7 @@ File conventions:
 - `house.ts`: house-scoped finders, mostly `(board, house, config)`; `findFullHouse` takes `(board, house)`. Must not allocate a board copy.
 - `box.ts`: box-scoped finders, `(board, box, config)`.
 - `board.ts`: board-level wrappers and appliers. Each applier lives beside the wrapper that produces its input. Hidden-single wrappers bind to `BOXES` or `LINES`; there is no separate `houses.ts`. A pattern that is not unit-scoped keeps its finder and applier together here.
-- `common.ts`: `applySimpleModifications`, `applyEliminations`, and `canEliminateCandidates`.
+- `common.ts`: `applySimpleModifications`, `applyEliminations`, `canEliminateCandidates`, and `findConfinedEliminations` (shared pointing/claiming search).
 - Add a new unit file only for a genuinely different search shape (for example `chain` or `fish`), not once per algorithm.
 - Do not leave half a pair in each file: when touching both finder and applier, move the whole pair into the new layout.
 

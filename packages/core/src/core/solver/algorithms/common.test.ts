@@ -1,18 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Board, Cell } from "../../../types/board.type.js";
 import { getUnit } from "../../../utils/board.js";
 import { indexToMask } from "../../../utils/bitwise.js";
 import { applySimpleModifications } from "./common.js";
-
-const solved: Cell = { value: 9, candidates: indexToMask(9) };
-const unsolved = (candidates: number): Cell => ({ value: null, candidates });
-const bits = (...digits: number[]): number => digits.reduce((mask, digit) => mask | indexToMask(digit), 0);
-
-const boardWith = (overrides: Record<number, Cell>): Board => {
-  const board: Board = Array.from({ length: 81 }, () => solved);
-  for (const [index, cell] of Object.entries(overrides)) board[Number(index)] = cell;
-  return board;
-};
+import { bits, boardWith, unsolved } from "./test-utils.js";
 
 describe("applySimpleModifications", () => {
   it("composes the peer eliminations of every placement in the batch", () => {

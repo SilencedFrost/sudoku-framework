@@ -15,8 +15,9 @@ packages/core/src/
         board.ts            # board-level wrappers/appliers
         box.ts              # box-scoped finder: pointing pairs/triples
         cell.ts             # cell-scoped finder: naked single
-        common.ts           # applySimpleModifications + applyEliminations + canEliminateCandidates
-        house.ts            # house-scoped finders: full house, hidden single, naked sets
+        common.ts           # appliers, canEliminateCandidates, shared confined-digit search
+        house.ts            # house-scoped finders: full house, hidden single, naked/hidden sets
+        test-utils.ts       # shared test board/mask builders (excluded from build)
         common.test.ts      # batch/dedup applier tests
         board.test.ts       # elimination applier tests
         house.test.ts       # naked-set finder tests
@@ -41,7 +42,7 @@ packages/core/src/
 
 ## Build and config gotchas
 
-- `packages/core/tsconfig.json` is `noEmit`; `tsconfig.build.json` enables emit to `dist` and excludes tests.
+- `packages/core/tsconfig.json` is `noEmit`; `tsconfig.build.json` enables emit to `dist` and excludes tests plus `test-utils.ts`.
 - Root `tsconfig.json` only covers `eslint.config.ts`; `pnpm typecheck` recurses per package.
 - `knip.ts` only configures `packages/core`; new packages may need their own Knip workspace entries.
 - The public API is only what `packages/core/src/index.ts` exports. Reflect public API changes there.

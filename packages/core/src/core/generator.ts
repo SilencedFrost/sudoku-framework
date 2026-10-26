@@ -1,8 +1,9 @@
 import seedrandom from "seedrandom";
+import { BOARD, PEERS } from "../constants/coordinates.js";
 import type { Board, Cell, GeneratedBoard } from "../types/board.type.js";
-import { PEERS } from "../constants/coordinates.js";
+import { countSetBits, fullMask } from "../utils/bitwise.js";
 
-const CELL_COUNT = PEERS.length;
+const CELL_COUNT = BOARD.length;
 const DIGIT_COUNT = 9;
 const MIN_HINTS = 17;
 const MAX_HINTS = 81;
@@ -11,9 +12,10 @@ const SOLUTION_LIMIT = 2;
 const DIG_MIN_HINTS = 25;
 const DIG_ATTEMPTS = 10;
 
-// Bit `digit - 1` represents `digit`, matching the solver's candidate masks.
-const ALL_DIGITS = 0b111111111;
-const ALL_INDICES: readonly number[] = PEERS.map((_peers, index) => index);
+// Local convention: bit `digit - 1` represents `digit`, 0 means empty. Solver
+// masks use bit `digit` instead, so generated candidates are untrusted; see
+// docs/agents/generator.md.
+const ALL_DIGITS = fullMask(DIGIT_COUNT);
 
 // Known 17-clue puzzles from Gordon Royle's collection. Used as starting points
 // for low hint counts, then randomly transformed and padded with clues.
@@ -62,16 +64,6 @@ const clear = (grid: Uint16Array, index: number): void => {
   grid[index] = 0;
 };
 
-const popcount = (mask: number): number => {
-  let remaining = mask;
-  let count = 0;
-  while (remaining !== 0) {
-    remaining &= remaining - 1;
-    count += 1;
-  }
-  return count;
-};
-
 const shuffleNumbers = (items: number[], random: () => number): number[] => {
   for (let i = items.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
@@ -96,10 +88,10 @@ const chooseCell = (grid: Uint16Array): Choice | null => {
   let choice = SOLVED;
   let fewestCandidates = DIGIT_COUNT + 1;
 
-  for (const index of ALL_INDICES) {
+  for (const index of BOARD) {
     if (gridAt(grid, index) !== 0) continue;
     const candidates = candidatesAt(grid, index);
-    const count = popcount(candidates);
+    const count = countSetBits(candidates);
     if (count === 0) return null;
     if (count < fewestCandidates) {
       fewestCandidates = count;
@@ -156,7 +148,7 @@ const solveOne = (grid: Uint16Array): boolean => {
 
 const parseGrid = (puzzle: string): Uint16Array => {
   const grid = new Uint16Array(CELL_COUNT);
-  for (const index of ALL_INDICES) {
+  for (const index of BOARD) {
     grid[index] = Number(puzzle[index] ?? "0");
   }
   return grid;
@@ -202,7 +194,7 @@ const digBoard = (hints: number, random: () => number): GeneratedBoard | null =>
 
     // Snapshot the completed grid before digging, since digging empties cells.
     const solution = new Uint16Array(grid);
-    const order = shuffleNumbers(ALL_INDICES.slice(), random);
+    const order = shuffleNumbers([...BOARD], random);
     let clues = CELL_COUNT;
 
     for (const index of order) {
@@ -234,7 +226,7 @@ const seedBoard = (hints: number, random: () => number): GeneratedBoard => {
   const solved = applyTransform(solution, transform);
 
   const emptyCells = shuffleNumbers(
-    ALL_INDICES.filter((index) => gridAt(grid, index) === 0),
+    BOARD.filter((index) => gridAt(grid, index) === 0),
     random,
   );
   let clues = CELL_COUNT - emptyCells.length;

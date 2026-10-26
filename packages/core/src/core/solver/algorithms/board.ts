@@ -7,17 +7,28 @@ import { findNakedSingle } from "./cell.js";
 import { findPointingPairsInBox } from "./box.js";
 import { findClaimingsInLine } from "./line.js";
 
-function findFullHouses(board: Board, { first = true }: BasicConfig = {}): SimpleModification[] | null {
-  const results: SimpleModification[] = [];
-  for (const house of HOUSES) {
-    const result = findFullHouse(board, house);
-
-    if (!result) continue;
-    if (first) return [result];
-    results.push(result);
+// Shared board-level scan: run a finder over every unit, returning the
+// first hit or every hit depending on `first`.
+function findInUnit<I, T>(unit: readonly I[], finder: (index: I) => T[] | null, first: boolean): T[] | null {
+  const results: T[] = [];
+  for (const index of unit) {
+    const found = finder(index);
+    if (!found) continue;
+    if (first) return found;
+    results.push(...found);
   }
-
   return results.length ? results : null;
+}
+
+function findFullHouses(board: Board, { first = true }: BasicConfig = {}): SimpleModification[] | null {
+  return findInUnit(
+    HOUSES,
+    (house) => {
+      const result = findFullHouse(board, house);
+      return result ? [result] : null;
+    },
+    first,
+  );
 }
 
 export function solveFullHouses(board: Board, config: BasicConfig = {}): Board | null {
@@ -25,14 +36,7 @@ export function solveFullHouses(board: Board, config: BasicConfig = {}): Board |
 }
 
 function findHiddenSinglesInHouses(board: Board, houses: typeof HOUSES, { first = true }: BasicConfig = {}): SimpleModification[] | null {
-  const results: SimpleModification[] = [];
-  for (const box of houses) {
-    const result = findHiddenSinglesInHouse(board, box, { first });
-    if (!result) continue;
-    if (first) return result;
-    results.push(...result);
-  }
-  return results.length ? results : null;
+  return findInUnit(houses, (house) => findHiddenSinglesInHouse(board, house, { first }), first);
 }
 
 export function solveHiddenSinglesBoxes(board: Board, config: BasicConfig = {}): Board | null {
@@ -44,15 +48,14 @@ export function solveHiddenSinglesLines(board: Board, config: BasicConfig = {}):
 }
 
 function findNakedSingles(board: Board, { first = true }: BasicConfig = {}): SimpleModification[] | null {
-  const results: SimpleModification[] = [];
-  for (const index of BOARD) {
-    const nakedSingle = findNakedSingle(board, index);
-    if (!nakedSingle) continue;
-    const result = { index, value: nakedSingle };
-    if (first) return [result];
-    results.push(result);
-  }
-  return results.length ? results : null;
+  return findInUnit(
+    BOARD,
+    (index) => {
+      const value = findNakedSingle(board, index);
+      return value === null ? null : [{ index, value }];
+    },
+    first,
+  );
 }
 
 export function solveNakedSingles(board: Board, config: BasicConfig): Board | null {
@@ -60,14 +63,7 @@ export function solveNakedSingles(board: Board, config: BasicConfig): Board | nu
 }
 
 function findPointingPairs(board: Board, { first = true }: BasicConfig = {}): CandidateElimination[] | null {
-  const results: CandidateElimination[] = [];
-  for (const box of BOXES) {
-    const result = findPointingPairsInBox(board, box, { first });
-    if (!result) continue;
-    if (first) return result;
-    results.push(...result);
-  }
-  return results.length ? results : null;
+  return findInUnit(BOXES, (box) => findPointingPairsInBox(board, box, { first }), first);
 }
 
 export function solvePointingPairs(board: Board, config: BasicConfig = {}): Board | null {
@@ -75,14 +71,7 @@ export function solvePointingPairs(board: Board, config: BasicConfig = {}): Boar
 }
 
 function findClaimings(board: Board, { first = true }: BasicConfig = {}): CandidateElimination[] | null {
-  const results: CandidateElimination[] = [];
-  for (const line of LINES) {
-    const result = findClaimingsInLine(board, line, { first });
-    if (!result) continue;
-    if (first) return result;
-    results.push(...result);
-  }
-  return results.length ? results : null;
+  return findInUnit(LINES, (line) => findClaimingsInLine(board, line, { first }), first);
 }
 
 export function solveClaimings(board: Board, config: BasicConfig = {}): Board | null {
@@ -90,15 +79,7 @@ export function solveClaimings(board: Board, config: BasicConfig = {}): Board | 
 }
 
 function findNakedSets(board: Board, { first = true, size }: BasicConfig & { size?: number } = {}): CandidateElimination[] | null {
-  const results: CandidateElimination[] = [];
-  for (const house of HOUSES) {
-    const result = findNakedSetsInHouse(board, house, { first, size });
-
-    if (!result) continue;
-    if (first) return result;
-    results.push(...result);
-  }
-  return results.length ? results : null;
+  return findInUnit(HOUSES, (house) => findNakedSetsInHouse(board, house, { first, size }), first);
 }
 
 export function solveNakedSets(board: Board, config: BasicConfig & { size?: number } = {}): Board | null {
@@ -106,15 +87,7 @@ export function solveNakedSets(board: Board, config: BasicConfig & { size?: numb
 }
 
 function findHiddenSets(board: Board, { first = true, size }: BasicConfig & { size?: number } = {}): CandidateElimination[] | null {
-  const results: CandidateElimination[] = [];
-  for (const house of HOUSES) {
-    const result = findHiddenSetsInHouse(board, house, { first, size });
-
-    if (!result) continue;
-    if (first) return result;
-    results.push(...result);
-  }
-  return results.length ? results : null;
+  return findInUnit(HOUSES, (house) => findHiddenSetsInHouse(board, house, { first, size }), first);
 }
 
 export function solveHiddenSets(board: Board, config: BasicConfig & { size?: number } = {}): Board | null {

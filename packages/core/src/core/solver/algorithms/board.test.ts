@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Board, Cell } from "../../../types/board.type.js";
 import { getUnit } from "../../../utils/board.js";
-import { indexToMask } from "../../../utils/bitwise.js";
 import { solveHiddenSets, solveNakedSets } from "./board.js";
-
-const solved: Cell = { value: 9, candidates: indexToMask(9) };
-const bits = (...digits: number[]): number => digits.reduce((mask, digit) => mask | indexToMask(digit), 0);
-
-const boardWith = (overrides: Record<number, Cell>): Board => {
-  const board: Board = Array.from({ length: 81 }, () => solved);
-  for (const [index, cell] of Object.entries(overrides)) board[Number(index)] = cell;
-  return board;
-};
+import { bits, boardWith } from "./test-utils.js";
 
 describe("solveNakedSets", () => {
   it("removes the set's candidates from non-member cells", () => {

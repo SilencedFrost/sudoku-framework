@@ -10,6 +10,98 @@ import { canEliminateCandidates } from "./common.js";
 
 type House = (typeof HOUSES)[number];
 
+interface SubsetSearch<T> {
+  readonly maskOf: (item: T) => number;
+  readonly isMinimal: (picked: readonly T[], union: number) => boolean;
+}
+
+interface SetSearch<T> extends SubsetSearch<T> {
+  readonly first: boolean;
+  readonly searchStart: number;
+  readonly nLimit: number;
+  readonly enforceMinimality: boolean;
+  readonly onSet: (picked: readonly T[], union: number, size: number) => CandidateElimination | null;
+}
+
+// Recursive search: pick k pool items whose masks add up to exactly k values.
+function findSubset<T>(
+  pool: readonly T[],
+  k: number,
+  search: SubsetSearch<T>,
+  enforceMinimality: boolean,
+  start = 0,
+  picked: number[] = [],
+  union = 0,
+): number[] | null {
+  if (picked.length === k) {
+    if (countSetBits(union) !== k) return null;
+    if (!enforceMinimality) return picked;
+    return search.isMinimal(picked.map((index) => getUnit(pool, index)), union) ? picked : null;
+  }
+
+  // Early prune: every (k-1)-subset of a minimal k-set must still span all k
+  // digits/cells. If this prefix does not, the omitted item is the sole holder
+  // of at least one value, so the final set would contain a smaller set.
+  if (enforceMinimality && picked.length === k - 1 && countSetBits(union) !== k) return null;
+  if (pool.length - start < k - picked.length) return null;
+
+  for (let i = start; i < pool.length; i++) {
+    const nextUnion = union | search.maskOf(getUnit(pool, i));
+    if (countSetBits(nextUnion) > k) continue;
+    const found = findSubset(pool, k, search, enforceMinimality, i + 1, [...picked, i], nextUnion);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Drop pool items whose mask shares no bit with any other item; they cannot
+// take part in a minimal set. Repeat until the pool stops shrinking.
+function prunePool<T>(pool: readonly T[], maskOf: (item: T) => number, minimum: number): T[] | null {
+  let remaining = [...pool];
+  let twice = 0;
+  let previousLength: number;
+  do {
+    if (remaining.length < minimum) return null;
+    previousLength = remaining.length;
+
+    let once = 0;
+    twice = 0;
+    for (const item of remaining) {
+      const mask = maskOf(item);
+      twice |= once & mask;
+      once |= mask;
+    }
+    remaining = remaining.filter((item) => (maskOf(item) & ~twice) === 0);
+  } while (remaining.length !== previousLength);
+
+  return countSetBits(twice) < minimum ? null : remaining;
+}
+
+// Consume sizes from `searchStart` up to `nLimit`, reporting through `onSet`.
+// A pool item belongs to only one set, so found items leave the pool.
+function collectSets<T>(initialPool: readonly T[], search: SetSearch<T>): CandidateElimination[] {
+  let pool = [...initialPool];
+  const results: CandidateElimination[] = [];
+
+  for (let k = search.searchStart; k <= search.nLimit; k++) {
+    let indices: number[] | null;
+    while (pool.length >= k && (indices = findSubset(pool, k, search, search.enforceMinimality)) !== null) {
+      const pickedIndices = new Set(indices);
+      const picked = indices.map((index) => getUnit(pool, index));
+      const union = picked.reduce((acc, item) => acc | search.maskOf(item), 0);
+
+      pool = pool.filter((_, index) => !pickedIndices.has(index));
+
+      const elimination = search.onSet(picked, union, k);
+      if (!elimination) continue;
+      if (search.first) return [elimination];
+      results.push(elimination);
+    }
+  }
+
+  return results;
+}
+
 // Full house: a house with exactly one empty cell -> missing digit = 45 - sum of filled
 export function findFullHouse(board: Board, house: House): SimpleModification | null {
   let sum = 0;
@@ -218,75 +310,37 @@ export function findNakedSetsInHouse(board: Board, house: House, { size: n, firs
   // A mask with a candidate that no other mask shares cannot be part of a set,
   // so drop it. This also enforces a necessary condition for minimality: in a
   // minimal k-set every digit appears in at least two of its cells.
-  let twice = 0;
-  let prevLength: number;
-  do {
-    if (usableMasks.length < SEARCH_START) return results.length > 0 ? results : null;
-    prevLength = usableMasks.length;
-
-    let once = 0;
-    twice = 0;
-    for (const m of usableMasks) {
-      twice |= once & m;
-      once |= m;
-    }
-    usableMasks = usableMasks.filter((m) => (m & ~twice) === 0);
-  } while (usableMasks.length !== prevLength);
-
-  if (countSetBits(twice) < SEARCH_START) return results.length > 0 ? results : null;
-
-  // --- Recursive search: pick k pool cells whose candidates add up to exactly k values ---
-  const findSubset = (pool: number[], k: number, start = 0, picked: number[] = [], union = 0): number[] | null => {
-    if (picked.length === k) {
-      if (countSetBits(union) !== k) return null;
-      if (!enforceMinimality) return picked;
-
-      // Minimality: every digit must be held by at least two cells of the set.
-      // A digit held by one cell would leave a naked (k-1)-set behind.
-      let seen = 0;
-      let seenTwice = 0;
-      for (const index of picked) {
-        const mask = pool[index] ?? 0;
-        seenTwice |= seen & mask;
-        seen |= mask;
-      }
-      return countSetBits(seenTwice) === k ? picked : null;
-    }
-
-    // Early prune: every (k-1)-subset of a minimal k-set must still span all k
-    // digits. If this prefix does not, the omitted cell is the sole holder of
-    // at least one digit, so the final set would contain a smaller naked set.
-    if (enforceMinimality && picked.length === k - 1 && countSetBits(union) !== k) return null;
-    if (pool.length - start < k - picked.length) return null;
-
-    for (let i = start; i < pool.length; i++) {
-      const nextUnion = union | (pool[i] ?? 0);
-      if (countSetBits(nextUnion) > k) continue;
-      const found = findSubset(pool, k, i + 1, [...picked, i], nextUnion);
-      if (found) return found;
-    }
-    return null;
-  };
+  const maskOf = (mask: number): number => mask;
+  const pruned = prunePool(usableMasks, maskOf, SEARCH_START);
+  if (!pruned) return results.length > 0 ? results : null;
+  usableMasks = pruned;
 
   // With no forced size this runs 3..nLimit; with a forced size it runs only n.
-  for (let k = SEARCH_START; k <= nLimit; k++) {
-    let indices: number[] | null;
-    while (usableMasks.length >= k && (indices = findSubset(usableMasks, k)) !== null) {
-      const picked = new Set(indices);
-
-      // Build the union before filtering: the indices point into the current pool.
-      const unionMask = indices.reduce((acc, i) => acc | (usableMasks[i] ?? 0), 0);
-
-      usableMasks = usableMasks.filter((_, i) => !picked.has(i)); // a cell belongs to only one naked set
-
-      assertNotOverfilled(unionMask, k);
-
-      if (!hasElimination(unionMask)) continue;
-      const elimination = { mask: unionMask, remove: collectTargets(unionMask) };
-      if (first) return [elimination];
-      results.push(elimination);
-    }
-  }
+  results.push(
+    ...collectSets(usableMasks, {
+      first,
+      searchStart: SEARCH_START,
+      nLimit,
+      enforceMinimality,
+      maskOf,
+      // Minimality: every digit must be held by at least two cells of the set.
+      // A digit held by one cell would leave a naked (k-1)-set behind.
+      isMinimal: (picked) => {
+        let seen = 0;
+        let seenTwice = 0;
+        for (const mask of picked) {
+          seenTwice |= seen & mask;
+          seen |= mask;
+        }
+        return countSetBits(seenTwice) === picked.length;
+      },
+      onSet: (_picked, unionMask, size) => {
+        assertNotOverfilled(unionMask, size);
+        if (!hasElimination(unionMask)) return null;
+        return { mask: unionMask, remove: collectTargets(unionMask) };
+      },
+    }),
+  );
 
   return results.length > 0 ? results : null;
 }
@@ -427,81 +481,42 @@ export function findHiddenSetsInHouse(board: Board, house: House, { size: n, fir
   // --- Prune until nothing changes ---
   // A digit occupying a cell no other digit can occupy cannot be part of a
   // minimal hidden set: dropping that digit would leave a smaller set behind.
-  let twice = 0;
-  let prevLength: number;
-  do {
-    if (usableDigits.length < SEARCH_START) return results.length > 0 ? results : null;
-    prevLength = usableDigits.length;
-
-    let once = 0;
-    twice = 0;
-    for (const { mask } of usableDigits) {
-      twice |= once & mask;
-      once |= mask;
-    }
-    usableDigits = usableDigits.filter(({ mask }) => (mask & ~twice) === 0);
-  } while (usableDigits.length !== prevLength);
-
-  if (countSetBits(twice) < SEARCH_START) return results.length > 0 ? results : null;
-
-  // --- Recursive search: pick k digit masks whose union spans exactly k cells ---
-  const findSubset = (pool: { digit: number; mask: number }[], k: number, start = 0, picked: number[] = [], union = 0): number[] | null => {
-    if (picked.length === k) {
-      if (countSetBits(union) !== k) return null;
-      if (!enforceMinimality) return picked;
-
-      // Minimality: every cell must stay covered after dropping any one digit,
-      // so neither the set nor any (k-1)-subset has a smaller hidden set.
-      let seen = 0;
-      let seenTwice = 0;
-      for (const index of picked) {
-        const mask = pool[index]?.mask ?? 0;
-        seenTwice |= seen & mask;
-        seen |= mask;
-      }
-      return seenTwice === union ? picked : null;
-    }
-
-    // Early prune: dropping one digit from a minimal k-set must not lose a
-    // cell, so a (k-1)-prefix still has to span all k cells.
-    if (enforceMinimality && picked.length === k - 1 && countSetBits(union) !== k) return null;
-    if (pool.length - start < k - picked.length) return null;
-
-    for (let i = start; i < pool.length; i++) {
-      const nextUnion = union | (pool[i]?.mask ?? 0);
-      if (countSetBits(nextUnion) > k) continue;
-      const found = findSubset(pool, k, i + 1, [...picked, i], nextUnion);
-      if (found) return found;
-    }
-    return null;
-  };
+  const maskOf = (entry: { readonly mask: number }): number => entry.mask;
+  const pruned = prunePool(usableDigits, maskOf, SEARCH_START);
+  if (!pruned) return results.length > 0 ? results : null;
+  usableDigits = pruned;
 
   // With no forced size this runs 3..nLimit; with a forced size it runs only n.
-  for (let k = SEARCH_START; k <= nLimit; k++) {
-    let indices: number[] | null;
-    while (usableDigits.length >= k && (indices = findSubset(usableDigits, k)) !== null) {
-      const picked = new Set(indices);
+  results.push(
+    ...collectSets(usableDigits, {
+      first,
+      searchStart: SEARCH_START,
+      nLimit,
+      enforceMinimality,
+      maskOf,
+      // Minimality: every cell must stay covered after dropping any one digit,
+      // so neither the set nor any (k-1)-subset has a smaller hidden set.
+      isMinimal: (picked, union) => {
+        let seen = 0;
+        let seenTwice = 0;
+        for (const entry of picked) {
+          seenTwice |= seen & entry.mask;
+          seen |= entry.mask;
+        }
+        return seenTwice === union;
+      },
+      onSet: (picked, unionMask, size) => {
+        let digitMask = 0;
+        for (const entry of picked) digitMask |= indexToMask(entry.digit);
 
-      let unionMask = 0;
-      let digitMask = 0;
-      for (const index of indices) {
-        const entry = usableDigits[index];
-        if (!entry) continue;
-        unionMask |= entry.mask;
-        digitMask |= indexToMask(entry.digit);
-      }
+        assertNotOverfilled(unionMask, size);
 
-      usableDigits = usableDigits.filter((_, i) => !picked.has(i)); // a digit belongs to only one hidden set
-
-      assertNotOverfilled(unionMask, k);
-
-      const removeMask = outsideOf(digitMask);
-      if (!hasElimination(unionMask, removeMask)) continue;
-      const elimination = { mask: removeMask, remove: membersOf(unionMask) };
-      if (first) return [elimination];
-      results.push(elimination);
-    }
-  }
+        const removeMask = outsideOf(digitMask);
+        if (!hasElimination(unionMask, removeMask)) return null;
+        return { mask: removeMask, remove: membersOf(unionMask) };
+      },
+    }),
+  );
 
   return results.length > 0 ? results : null;
 }

@@ -4,22 +4,13 @@ import { FULL_DIGIT_MASK } from "../../../constants/bitwise.js";
 import { ROWS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import { getUnit } from "../../../utils/board.js";
-import { indexToMask, setBitIndices } from "../../../utils/bitwise.js";
+import { indexToMask, countSetBits, setBitIndices } from "../../../utils/bitwise.js";
 import { applyEliminations } from "./common.js";
 import { findHiddenSetsInHouse, findNakedSetsInHouse } from "./house.js";
+import { bits } from "./test-utils.js";
 
 const house = getUnit(ROWS, 0);
 
-const popcount = (mask: number): number => {
-  let count = 0;
-  while (mask !== 0) {
-    mask &= mask - 1;
-    count++;
-  }
-  return count;
-};
-
-const bits = (...digits: number[]): number => digits.reduce((mask, digit) => mask | indexToMask(digit), 0);
 const outside = (...digits: number[]): number => FULL_DIGIT_MASK & ~bits(...digits);
 
 const boardFromHouse = (masks: (number | null)[]): Board => {
@@ -51,7 +42,7 @@ const isMinimal = (board: Board, mask: number, k: number): boolean => {
     cells.forEach((index, position) => {
       if (position !== omit) union |= getUnit(board, index).candidates;
     });
-    if (popcount(union) !== k) return false;
+    if (countSetBits(union) !== k) return false;
   }
   return true;
 };
@@ -78,7 +69,7 @@ const isMinimalHidden = (board: Board, mask: number): boolean => {
       size++;
       union |= positionsOf(board, digit);
     });
-    if (popcount(union) === size) return false;
+    if (countSetBits(union) === size) return false;
   }
   return true;
 };
@@ -92,7 +83,7 @@ const seededRandom = (initialSeed: number) => {
   const randomMask = (): number => {
     const size = 2 + Math.floor(random() * 3); // 2..4 candidates
     let mask = 0;
-    while (popcount(mask) < size) mask |= indexToMask(1 + Math.floor(random() * 9));
+    while (countSetBits(mask) < size) mask |= indexToMask(1 + Math.floor(random() * 9));
     return mask;
   };
   return { random, randomMask };
@@ -150,7 +141,7 @@ describe("findNakedSetsInHouse", () => {
         continue;
       }
       for (const { mask } of found ?? []) {
-        const size = popcount(mask);
+        const size = countSetBits(mask);
         if (!isMinimal(board, mask, size)) violations.push(`trial=${trial.toString()} mask=${mask.toString(2)} size=${size.toString()}`);
       }
     }
@@ -263,7 +254,7 @@ describe("findHiddenSetsInHouse", () => {
         const union = digits.reduce((acc, digit) => acc | positionsOf(board, digit), 0);
         const expectedRemove = setBitIndices(union).map((position) => getUnit(house, position));
         const removeMatches = remove.length === expectedRemove.length && remove.every((index, position) => index === expectedRemove[position]);
-        if (popcount(union) !== digits.length || !removeMatches || !isMinimalHidden(board, digitMask)) {
+        if (countSetBits(union) !== digits.length || !removeMatches || !isMinimalHidden(board, digitMask)) {
           violations.push(`trial=${trial.toString()} mask=${mask.toString(2)}`);
         }
       }

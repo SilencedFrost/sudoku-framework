@@ -12,6 +12,24 @@ import {
   solvePointingPairs,
 } from "./algorithms/board.js";
 
+interface SolveStep {
+  readonly alg: Algorithm;
+  readonly solve: (board: Board) => Board | null;
+}
+
+// Ordered by difficulty after FullHouse, which runs before sanitizing.
+const STEPS: readonly SolveStep[] = [
+  { alg: "HiddenSingleBox", solve: (board) => solveHiddenSinglesBoxes(board, { first: false }) },
+  { alg: "HiddenSingleLine", solve: (board) => solveHiddenSinglesLines(board, { first: false }) },
+  { alg: "NakedSingle", solve: (board) => solveNakedSingles(board, { first: false }) },
+  { alg: "PointingPairs", solve: (board) => solvePointingPairs(board, { first: true }) },
+  { alg: "Claiming", solve: (board) => solveClaimings(board, { first: true }) },
+  { alg: "NakedPair", solve: (board) => solveNakedSets(board, { size: 2, first: true }) },
+  { alg: "HiddenPair", solve: (board) => solveHiddenSets(board, { size: 2, first: true }) },
+  { alg: "NakedTriple", solve: (board) => solveNakedSets(board, { size: 3, first: true }) },
+  { alg: "HiddenTriple", solve: (board) => solveHiddenSets(board, { size: 3, first: true }) },
+];
+
 // TODO: improve solveAll with bulk actions + stateful skipping (Owns the loop, selective calling, dirty house tracking)
 export function solveAll(board: Board): Board {
   let solvingBoard = board;
@@ -36,32 +54,10 @@ export function solveStep(board: Board, { candidates = "sanitize" }: { candidate
   // Sanitize obvious candidates if untrusted, ready for higher algs
   if (candidates !== "rebuild") newBoard = candidates === "trust" ? newBoard : sanitizeCandidates(newBoard);
 
-  const hiddenSingleBox = solveHiddenSinglesBoxes(newBoard, { first: false });
-  if (hiddenSingleBox) return { board: hiddenSingleBox, alg: "HiddenSingleBox" };
-
-  const hiddenSingleLine = solveHiddenSinglesLines(newBoard, { first: false });
-  if (hiddenSingleLine) return { board: hiddenSingleLine, alg: "HiddenSingleLine" };
-
-  const nakedSingle = solveNakedSingles(newBoard, { first: false });
-  if (nakedSingle) return { board: nakedSingle, alg: "NakedSingle" };
-
-  const pointingPairs = solvePointingPairs(newBoard, { first: true });
-  if (pointingPairs) return { board: pointingPairs, alg: "PointingPairs" };
-
-  const claiming = solveClaimings(newBoard, { first: true });
-  if (claiming) return { board: claiming, alg: "Claiming" };
-
-  const nakedPair = solveNakedSets(newBoard, { size: 2, first: true });
-  if (nakedPair) return { board: nakedPair, alg: "NakedPair" };
-
-  const hiddenPair = solveHiddenSets(newBoard, { size: 2, first: true });
-  if (hiddenPair) return { board: hiddenPair, alg: "HiddenPair" };
-
-  const nakedTriple = solveNakedSets(newBoard, { size: 3, first: true });
-  if (nakedTriple) return { board: nakedTriple, alg: "NakedTriple" };
-
-  const hiddenTriple = solveHiddenSets(newBoard, { size: 3, first: true });
-  if (hiddenTriple) return { board: hiddenTriple, alg: "HiddenTriple" };
+  for (const { alg, solve } of STEPS) {
+    const solved = solve(newBoard);
+    if (solved) return { board: solved, alg };
+  }
 
   // No solution
   return null;
