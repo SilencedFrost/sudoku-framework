@@ -49,6 +49,10 @@ export function removeCandidate(board: Board, index: number, mask: number): Cell
   return cell.candidates === newCandidates ? cell : { ...cell, candidates: newCandidates };
 }
 
+export function transpose(candidates: readonly number[], digit: number): number {
+  return candidates.reduce((mask, candidate, j) => ((candidate & indexToMask(digit)) !== 0 ? mask | (1 << j) : mask), 0);
+}
+
 export function* candidatesToDigitMasks(board: Board, indexes: readonly number[]): Generator<{ digit: number; mask: number }> {
   let eligible = FULL_DIGIT_MASK;
   const candidates: number[] = [];
@@ -64,10 +68,5 @@ export function* candidatesToDigitMasks(board: Board, indexes: readonly number[]
 
   if (eligible === 0) return;
 
-  for (let i = 1; i <= 9; i++) {
-    if (!isBitSet(eligible, i)) continue;
-    const digitMask = indexToMask(i);
-    const positionMask = candidates.reduce((mask, candidate, j) => ((candidate & digitMask) !== 0 ? mask | (1 << j) : mask), 0);
-    yield { digit: i, mask: positionMask };
-  }
+  for (let i = 1; i <= 9; i++) if (isBitSet(eligible, i)) yield { digit: i, mask: transpose(candidates, i) };
 }
