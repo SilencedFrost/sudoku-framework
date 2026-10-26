@@ -1,8 +1,16 @@
 import type { Board } from "../../types/board.type.js";
 import type { Algorithm } from "../../types/algorithms.type.js";
 import { sanitizeCandidates } from "../../utils/board.js";
-import { solveHiddenPair } from "./algorithms/algorithms.js";
-import { solveClaimings, solveFullHouses, solveHiddenSinglesBoxes, solveHiddenSinglesLines, solveNakedSets, solveNakedSingles, solvePointingPairs } from "./algorithms/board.js";
+import {
+  solveClaimings,
+  solveFullHouses,
+  solveHiddenSets,
+  solveHiddenSinglesBoxes,
+  solveHiddenSinglesLines,
+  solveNakedSets,
+  solveNakedSingles,
+  solvePointingPairs,
+} from "./algorithms/board.js";
 
 // TODO: improve solveAll with bulk actions + stateful skipping (Owns the loop, selective calling, dirty house tracking)
 export function solveAll(board: Board): Board {
@@ -46,11 +54,14 @@ export function solveStep(board: Board, { candidates = "sanitize" }: { candidate
   const nakedPair = solveNakedSets(newBoard, { size: 2, first: true });
   if (nakedPair) return { board: nakedPair, alg: "NakedPair" };
 
-  const hiddenPair = solveHiddenPair(newBoard);
+  const hiddenPair = solveHiddenSets(newBoard, { size: 2, first: true });
   if (hiddenPair) return { board: hiddenPair, alg: "HiddenPair" };
 
   const nakedTriple = solveNakedSets(newBoard, { size: 3, first: true });
   if (nakedTriple) return { board: nakedTriple, alg: "NakedTriple" };
+
+  const hiddenTriple = solveHiddenSets(newBoard, { size: 3, first: true });
+  if (hiddenTriple) return { board: hiddenTriple, alg: "HiddenTriple" };
 
   // No solution
   return null;

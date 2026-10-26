@@ -19,8 +19,9 @@ Load when adding or updating tests.
 - `utils/bitwise.test.ts`
 - `algorithms/common.test.ts` (batch applier/dedup/immutability)
 - `algorithms/house.test.ts` (naked- and hidden-set minimality, including randomized cases)
+- `algorithms/board.test.ts` (naked- and hidden-set board wrappers/appliers)
 
-Gaps: `canEliminateCandidates` is untested, and there is no `cell.test.ts`, `box.test.ts`, `board.test.ts`, `solver.test.ts`, or generator test yet. Add those when touching the corresponding code.
+Gaps: `canEliminateCandidates` is untested, and there is no `cell.test.ts`, `box.test.ts`, `solver.test.ts`, or generator test yet. Add those when touching the corresponding code.
 
 ## Commands
 

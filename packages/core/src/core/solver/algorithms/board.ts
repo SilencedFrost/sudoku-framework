@@ -2,7 +2,7 @@ import { BOARD, BOXES, HOUSES, LINES } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import type { BasicConfig, CandidateElimination, SimpleModification } from "../../../types/algorithms.type.js";
 import { applyEliminations, applySimpleModifications } from "./common.js";
-import { findFullHouse, findHiddenSinglesInHouse, findNakedSetsInHouse } from "./house.js";
+import { findFullHouse, findHiddenSetsInHouse, findHiddenSinglesInHouse, findNakedSetsInHouse } from "./house.js";
 import { findNakedSingle } from "./cell.js";
 import { findPointingPairsInBox } from "./box.js";
 import { findClaimingsInLine } from "./line.js";
@@ -103,4 +103,20 @@ function findNakedSets(board: Board, { first = true, size }: BasicConfig & { siz
 
 export function solveNakedSets(board: Board, config: BasicConfig & { size?: number } = {}): Board | null {
   return applyEliminations(board, findNakedSets(board, config));
+}
+
+function findHiddenSets(board: Board, { first = true, size }: BasicConfig & { size?: number } = {}): CandidateElimination[] | null {
+  const results: CandidateElimination[] = [];
+  for (const house of HOUSES) {
+    const result = findHiddenSetsInHouse(board, house, { first, size });
+
+    if (!result) continue;
+    if (first) return result;
+    results.push(...result);
+  }
+  return results.length ? results : null;
+}
+
+export function solveHiddenSets(board: Board, config: BasicConfig & { size?: number } = {}): Board | null {
+  return applyEliminations(board, findHiddenSets(board, config));
 }
