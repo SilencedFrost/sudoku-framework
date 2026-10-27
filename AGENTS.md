@@ -2,13 +2,11 @@
 
 Entry point for agents working in this repository. Read this file first, then load only the domain doc(s) relevant to the task.
 
-> **Doc baseline:** `9b1fdca` (`chore: changed all removeCandidates to work on new board to prevent conflicts`). Trace changes with `git diff 9b1fdca -- AGENTS.md docs/agents`.
-
 ## Snapshot
 
-`sudoku-framework` is a pnpm monorepo for a Sudoku engine. Only `packages/core` is populated; `packages/web` is an empty placeholders. There is no README.
+`sudoku-framework` is a pnpm monorepo with one package, `@sudoku/core`. There is no README.
 
-- Node >= 22.13, pnpm >= 11 (`pnpm@11.15.1`), ESM, TypeScript ~6.0.3 (`NodeNext`, strict), Vitest.
+- Node >= 22.13, pnpm 11 (`pnpm@11.15.1`), ESM, TypeScript ~6.0.3 (`NodeNext`, strict), Vitest.
 - Lint/typecheck: ESLint 10 + typescript-eslint (`strictTypeChecked`, `stylisticTypeChecked`), `tsc --noEmit`. Unused-code check: Knip.
 - Generator randomness: `seedrandom`.
 - Public API (`packages/core/src/index.ts`): `resolveCandidates`, `solveStep`, `solveAll`, `newBoard`, `sanitizeCandidates`, `Cell`, `Board`.
@@ -52,6 +50,6 @@ Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before finishing.
 | Difficulty rating or grader contracts                           | [`docs/agents/grader.md`](docs/agents/grader.md)       |
 | Tests and coverage expectations                                 | [`docs/agents/testing.md`](docs/agents/testing.md)     |
 | Build config, workspace, repo layout, tooling                   | [`docs/agents/tooling.md`](docs/agents/tooling.md)     |
-| Throughput benchmarks, profiling, packaging against speed       | [`performance.md`](docs/agents/performance.md)         |
+| Throughput benchmarks, profiling, packaging against speed       | [`docs/agents/performance.md`](docs/agents/performance.md) |
 
 When behavior changes, update the matching domain doc. Keep this file short; details belong in `docs/agents/`.

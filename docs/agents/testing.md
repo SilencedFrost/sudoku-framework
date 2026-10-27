@@ -12,7 +12,7 @@ Load when adding or updating tests.
 - Add tests for any new bitwise helper, solver algorithm, or generator change.
 - Verify solver results against `newBoard(...).solution`, and pass a seed (`newBoard(hints, "seed")`) so failures reproduce.
 - Cover `applySimpleModifications` when changing placement/batch behavior: duplicate indices, conflicting digits (first wins), and peer-removal composition.
-- Mirror the source scope: `algorithms/house.test.ts` for house finders, `algorithms/box.test.ts` for the box finder, `algorithms/cell.test.ts` for the cell finder, `algorithms/board.test.ts` for board wrappers/appliers, and `solver.test.ts` for ordering and `alg` keys.
+- Mirror the source scope: `algorithms/house.test.ts` for house finders, `algorithms/box.test.ts` for box finders, `algorithms/line.test.ts` for line finders, `algorithms/cell.test.ts` for the cell finder, `algorithms/board.test.ts` for board wrappers/appliers, and `solver.test.ts` for ordering and `alg` keys.
 
 ## Current coverage
 
