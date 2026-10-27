@@ -17,7 +17,7 @@ Load when adding or updating tests.
 ## Current coverage
 
 - `utils/bitwise.test.ts`
-- `algorithms/common.test.ts` (batch applier/dedup/immutability)
+- `algorithms/common.test.ts` (batch applier/dedup/immutability, Hall unions)
 - `algorithms/house.test.ts` (naked- and hidden-set minimality, including randomized cases)
 - `algorithms/box.test.ts` (pointing pairs/triples)
 - `algorithms/line.test.ts` (claiming, row and column directions)

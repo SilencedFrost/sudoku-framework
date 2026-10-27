@@ -40,6 +40,7 @@ Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before finishing.
 - **Imports/style:** ESM with explicit `.js` extensions; `import type` for types; explicit return types on exports; prefer `readonly`.
 - **Errors:** `RangeError` for bad indices/lengths/hint counts, `IllegalStateError` for contradictory boards; avoid plain `Error`.
 - **Public API:** exposed only through `packages/core/src/index.ts`.
+- **Uncertainty:** route ambiguities, conflicting instructions, and design choices to the user via the `question` tool instead of guessing.
 
 ## Load on demand
 

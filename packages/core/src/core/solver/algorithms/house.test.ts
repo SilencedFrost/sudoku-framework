@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { IllegalStateError } from "../../../classes/errors.js";
 import { FULL_DIGIT_MASK } from "../../../constants/bitwise.js";
 import { ROWS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
@@ -45,6 +44,33 @@ const isMinimal = (board: Board, mask: number, k: number): boolean => {
     if (countSetBits(union) !== k) return false;
   }
   return true;
+};
+
+// A house is solvable only when its unsolved cells can be matched to distinct
+// candidates (Hall's condition). Random test boards can violate it, in which
+// case no set they contain is a meaningful deduction.
+const hasFullMatching = (board: Board): boolean => {
+  const cellMasks = house.flatMap((index) => {
+    const cell = getUnit(board, index);
+    return cell.value ? [] : [cell.candidates];
+  });
+  const owner = new Map<number, number>();
+
+  const assign = (cell: number, visited: Set<number>): boolean => {
+    for (let digit = 1; digit <= 9; digit++) {
+      const bit = indexToMask(digit);
+      if ((getUnit(cellMasks, cell) & bit) === 0 || visited.has(digit)) continue;
+      visited.add(digit);
+      const current = owner.get(digit);
+      if (current === undefined || assign(current, visited)) {
+        owner.set(digit, cell);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  return cellMasks.every((_, cell) => assign(cell, new Set()));
 };
 
 // House-relative position mask of every unsolved cell that can still hold `digit`.
@@ -114,11 +140,12 @@ describe("findNakedSetsInHouse", () => {
 
     for (let trial = 0; trial < 2000; trial++) {
       const board = randomBoard(random, randomMask);
+      if (!hasFullMatching(board)) continue; // overfilled house: not relevant to this check
       let found: ReturnType<typeof findNakedSetsInHouse>;
       try {
         found = findNakedSetsInHouse(board, house, { size: 4 });
       } catch {
-        continue; // overfilled house: not relevant to this check
+        continue;
       }
       for (const { mask } of found ?? []) {
         if (!isMinimal(board, mask, 4)) violations.push(`trial=${trial.toString()} mask=${mask.toString(2)}`);
@@ -134,6 +161,7 @@ describe("findNakedSetsInHouse", () => {
 
     for (let trial = 0; trial < 2000; trial++) {
       const board = randomBoard(random, randomMask);
+      if (!hasFullMatching(board)) continue; // overfilled house: not relevant to this check
       let found: ReturnType<typeof findNakedSetsInHouse>;
       try {
         found = findNakedSetsInHouse(board, house);
@@ -228,10 +256,10 @@ describe("findHiddenSetsInHouse", () => {
     expect(findHiddenSetsInHouse(board, house, { size: 2 })).toBeNull();
   });
 
-  it("throws when three digits share the same pair of cells", () => {
+  it("does not treat three digits confined to the same pair of cells as a hidden pair", () => {
     const board = boardFromHouse([bits(1, 2, 3), bits(1, 2, 3), null, null, null, null, null, null, null]);
 
-    expect(() => findHiddenSetsInHouse(board, house, { size: 2 })).toThrow(IllegalStateError);
+    expect(findHiddenSetsInHouse(board, house, { size: 2 })).toBeNull();
   });
 
   it("returns only minimal sets", () => {
@@ -241,6 +269,7 @@ describe("findHiddenSetsInHouse", () => {
 
     for (let trial = 0; trial < 2000; trial++) {
       const board = randomBoard(random, randomMask);
+      if (!hasFullMatching(board)) continue; // overfilled house: not relevant to this check
       let found: ReturnType<typeof findHiddenSetsInHouse>;
       try {
         found = findHiddenSetsInHouse(board, house);

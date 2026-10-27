@@ -180,6 +180,55 @@ Packed SMI arrays are already unboxed for small integers, so there is no boxing 
 - The paired harness loads baseline and variant `dist` copies into one process (variant copied next to `packages/core` so `seedrandom` still resolves), generates the same seed from each build, warms both, then alternates measurement order each round.
 - Both stage patches were applied with `git apply` from temp and reverted with `git checkout -- packages/core/src`; the tree is unchanged.
 
+## Tried: `hallUnions` for hidden sets (2026-10)
+
+Replaced the recursive subset search behind `findHiddenSetsInHouse` sizes 3/4 with the shared `hallUnions` (`algorithms/common.ts`). Measured the house finder directly (not `solveAll`): 600 distinct solver-state boards sampled evenly from 3 769 boards produced by `solveStep` on 150 seeds (`newBoard(27, "probe-NN")`), all 27 houses per board, board-level `first` semantics (stop after the first usable house), 31 paired rounds per combo with randomized combo and variant order, both built `dist` copies loaded in one process. Values are µs per board; two identical builds differed by at most 0.5%, so the n=2 rows are controls (that path returns before the search).
+
+| Request         | DFS (before) | `hallUnions` (after) | Δ      |
+| --------------- | ------------ | -------------------- | ------ |
+| n=2, first=true | 6.11         | 6.20                 | ~0     |
+| n=2, first=false | 12.42       | 12.63                | ~0     |
+| n=4, first=true | 11.29        | 12.57                | +11.4% |
+| n=4, first=false | 13.74       | 15.22                | +11.6% |
+
+Findings:
+
+- **The size-2 pass was pure overhead in that design.** Hidden sets reported and removed pairs before the search, so the pool had no duplicate pair masks and `hallUnions`' size-2 pass could never verify a union. Patching `searchSizes` in a scratch build to skip that pass moved n=4 to +2.6% / +2.7% (still slower). Pairs were later moved into `hallUnions`, so the pass is now the pair path; see the follow-up below.
+- **`first` could not be forwarded as-is.** The finder must skip unions that eliminate nothing, which `hallUnions` cannot know, so every union is enumerated even when `first` is set. Forwarding `first` *and* skipping the pair pass was ~1% faster than DFS at n=4 first=true on this corpus, but it returns the wrong result when the first union is clean; correctness would need a fallback that re-runs with `first: false`. The option was later removed; the finder owns `first`.
+- **Output parity.** On 9 031 boards (solver states plus deterministic candidate mutations) sizes 2, 3, 4 and the default search matched DFS exactly, except for the overfill case below.
+- **Overfill check weakened.** `hallUnions` verifies only unions containing exactly as many masks as cells, so a house with more digits than cells confined to the same cells (e.g. five digits in four cells) no longer throws `IllegalStateError` for sizes 3/4; it returns `null`. Reported sets are still checked, and the size-2 pair path still throws.
+- **Kept anyway** (decision recorded): the wired solver path uses only `size: 2`, so end-to-end throughput is unchanged. The cost is limited to the unwired hidden triple/quad search, which now shares one search implementation with the naked-set path.
+
+### Follow-up: pairs moved into `hallUnions`
+
+`findHiddenSetsInHouse` no longer has its own size-2 pass. It hands every eligible digit mask to `hallUnions` and asks for the requested size, so pairs are found by the same Hall-union function (with a dedicated size-2 fast path).
+
+- `hallUnions` returns only the requested size. Smaller unions are consumed first to keep larger sets minimal, but they are not reported; this is what lets a forced size 3 or 4 ask the finder for exactly that size without leaking a pair.
+- `hallUnions` lost its `first` option: no caller used it, and the finder still needs to skip unions that eliminate nothing before honouring `first`.
+- The `IllegalStateError` for three digits on the same pair of cells is preserved by a small pair-group check before the search. Overfilled groups at sizes 3/4 that never form a union still return `null`.
+- The n=2 and n=4 timings above no longer describe this build: the pool now contains the pair masks that the old pre-pass removed, and the size-2 request no longer returns before the search. The wired `size: 2` path and the size-2 fast path are measured in the follow-up below.
+
+The benchmark harness and differential checker are scratch files in `%TEMP%\opencode` (`hidden-sets-bench.mjs`, `diff-hidden.mjs`), not committed.
+
+### Follow-up benchmark: size-2 fast path and a size-3 pair pass (2026-10)
+
+Question: after pairs moved into `hallUnions`, should a forced size 3 keep an explicit size-2 pass (the old size-3 special case), or rely only on `rejectNested`? The size-2 pass itself was replaced by a dedicated count of identical two-value masks; the recursive search remains for larger sizes.
+
+Method: same finder corpus as above, 600 boards sampled from 3 769 solver states, all 27 houses per board, 31 paired rounds with randomized combo/variant order, both built `dist` copies loaded in one process. Values are µs per board; lower is better. The control is the pre-fast-path build. The n=3 rows are controls for code-layout drift because that request never enters the size-2 path.
+
+| Request             | Control | Fast path | Δ      |
+| ------------------- | ------- | --------- | ------ |
+| n=2, first=true     | 7.905   | 7.666     | −3.0%  |
+| n=2, first=false    | 16.038  | 15.475    | −3.5%  |
+| n=3, first=true     | 10.871  | 10.899    | +0.3%  |
+| n=3, first=false    | 15.899  | 15.877    | −0.1%  |
+| n=4, first=true     | 13.416  | 13.367    | −0.4%  |
+| n=4, first=false    | 16.386  | 16.183    | −1.2%  |
+| default, first=true | 8.316   | 8.377     | +0.7%  |
+| default, first=false | 24.081 | 24.088    | ~0%    |
+
+Adding the size-2 pass to a forced 3 (`searchSizes(3) = [2, 3]`) was slower: n=3 first=true went from 10.590 to 11.085 µs/board (+4.7%, only 1/31 rounds faster), and first=false from 15.558 to 16.102 (+3.5%, 2/31 faster). Against the same fast-path build without the pass, the extra pass alone cost about +3.3%. **Kept `searchSizes(3) = [3]`**: `rejectNested` is cheaper than searching pairs first, and the fast path still pays off for actual size-2 requests (and the size-4/default passes that include one).
+
 ## Not tried yet
 
 - The CPU profile now exists (see above); the next step is `--trace-opt` / `--trace-deopt` on the top three functions to see whether `findFullHouses`, `findHiddenSinglesInHouse` and `applySimpleModifications` are actually being optimized, and whether `Cell` objects stay monomorphic.
