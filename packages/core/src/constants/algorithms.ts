@@ -7,7 +7,7 @@ export const ALGORITHM_SCORE = {
 
   // --- Easy (11-25) ---
   PointingPairs: 14, // also covers pointing triples
-  BoxLineReduction: 17, // a.k.a. Claiming
+  Claiming: 17,
   NakedPair: 22,
   HiddenPair: 25,
 
@@ -54,4 +54,5 @@ export const ALGORITHM_SCORE = {
   KrakenFish: 93, // a.k.a. Mutant Fish
   DynamicForcingChains: 95,
   NestedForcingChains: 98,
+  BowmanBingo: 100,
 } as const;

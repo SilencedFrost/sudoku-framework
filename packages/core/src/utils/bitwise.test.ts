@@ -88,6 +88,7 @@ describe("fullMask", () => {
     { n: 9, mask: 0b111111111 },
     { n: 10, mask: 0b1111111111 },
     { n: 31, mask: 0x7fffffff },
+    { n: 32, mask: -1 },
   ])("sets the lowest $n bits", ({ n, mask }) => {
     expect(fullMask(n)).toBe(mask);
   });
@@ -97,7 +98,7 @@ describe("fullMask", () => {
   });
 
   it("throws for a size wider than 32 bits", () => {
-    expect(() => fullMask(32)).toThrow(RangeError);
+    expect(() => fullMask(33)).toThrow(RangeError);
   });
 
   it("masks out the reserved bit 0 to leave the nine candidate bits", () => {
