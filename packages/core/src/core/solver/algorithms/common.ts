@@ -1,3 +1,4 @@
+import { MAX_SET_SIZE, UNIT_SIZE } from "../../../constants/board.js";
 import { PEERS } from "../../../constants/coordinates.js";
 import type { Board } from "../../../types/board.type.js";
 import type { BasicConfig, CandidateElimination, SimpleModification } from "../../../types/algorithms.type.js";
@@ -72,10 +73,11 @@ export function findConfinedEliminations(
   const results: CandidateElimination[] = [];
 
   for (const { digit, mask } of candidatesToDigitMasks(board, unit)) {
-    // Pointing needs a pair or triple; claiming also allows a single position
-    // (a hidden-single-strength elimination).
+    // Pointing needs at least a pair; claiming also allows a single position
+    // (a hidden-single-strength elimination). An alignment spans at most one
+    // box row/column, so UNIT_SIZE is the largest possible confinement.
     const positions = countSetBits(mask);
-    if (positions < minPositions || positions > 3) continue;
+    if (positions < minPositions || positions > UNIT_SIZE) continue;
 
     let targetCells: readonly number[] | null = null;
     for (const direction of directions) {
@@ -103,9 +105,13 @@ export function findConfinedEliminations(
 // encloses a set of that size, which is cheaper than searching it explicitly.
 // The default reports every supported size, so no pass is skipped.
 function searchSizes(size?: number): number[] {
-  if (size === undefined) return [2, 3, 4];
-
   const sizes: number[] = [];
+
+  if (size === undefined) {
+    for (let k = 2; k <= MAX_SET_SIZE; k++) sizes.push(k);
+    return sizes;
+  }
+
   for (let k = 2; k <= size - 2; k++) sizes.push(k);
   sizes.push(size);
   return sizes;

@@ -14,4 +14,4 @@ Load when changing `core/generator.ts`, generated-board shape, or uniqueness beh
 - `toBoard` copies those masks into `Cell.candidates` for unsolved puzzle cells instead of converting them. Filled puzzle cells and every solution cell get `candidates: 0`.
 - Generated candidate masks are therefore **untrusted for the solver**. Call `sanitizeCandidates(board, true)` or run `solveStep`/`solveAll` with `"rebuild"` before treating a generated puzzle as a solver board.
 - Use `GeneratedBoard.solution` to validate generated puzzles and solver results. Pass a seed in tests so failures reproduce.
-- This file is one of the remaining 9x9-specific areas.
+- This file is the remaining 9x9-specific area: it hardcodes the digit count, hint bounds, and seed transforms, so it does not follow `UNIT_SIZE`. Generalizing the board elsewhere does not change `newBoard`.

@@ -32,7 +32,7 @@ Run `pnpm test`, `pnpm typecheck`, and `pnpm lint` before finishing.
 
 ## Always apply
 
-- **Board shape:** 81 cells, 0-based row-major (`index = row * 9 + column`); candidate bits 1..9 represent digits 1..9 (`1 << digit`).
+- **Board shape:** `BOARD_SIZE` cells (`HOUSE_SIZE ** 2`; 81 at `UNIT_SIZE = 3`), 0-based row-major (`index = row * HOUSE_SIZE + column`); candidate bits 1..`HOUSE_SIZE` represent digits 1..`HOUSE_SIZE` (`1 << digit`). Board size is derived from `UNIT_SIZE` and generalizes up to 5; `core/generator.ts` remains 9x9-only.
 - **Immutability:** solver, finder, and applier code never mutates the input board or its cells; return a new board and reuse unchanged `Cell` objects.
 - **Find/apply split:** keep pure `findX` detection separate from `solveX` application; do not collapse them.
 - **Imports/style:** ESM with explicit `.js` extensions; `import type` for types; explicit return types on exports; prefer `readonly`.

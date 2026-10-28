@@ -1,3 +1,5 @@
+import { DIGITS } from "../constants/board.js";
+
 export function indexToMask(digit: number): number {
   return 1 << digit;
 }
@@ -47,10 +49,10 @@ export function resolveCandidates(mask: number, output: "number"): number[];
 export function resolveCandidates(mask: number, output: "boolean" | "number"): boolean[] | number[] {
   const bools: boolean[] = [];
   const numbers: number[] = [];
-  for (let i = 0; i < 9; i++) {
-    const isSet = isBitSet(mask, i + 1);
-    bools[i] = isSet;
-    if (isSet) numbers.push(i + 1);
+  for (const digit of DIGITS) {
+    const isSet = isBitSet(mask, digit);
+    bools[digit - 1] = isSet;
+    if (isSet) numbers.push(digit);
   }
 
   return output === "boolean" ? bools : numbers;

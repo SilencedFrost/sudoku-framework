@@ -28,6 +28,8 @@ const STEPS: readonly SolveStep[] = [
   { alg: "HiddenPair", solve: (board) => solveHiddenSets(board, { size: 2, first: true }) },
   { alg: "NakedTriple", solve: (board) => solveNakedSets(board, { size: 3, first: true }) },
   { alg: "HiddenTriple", solve: (board) => solveHiddenSets(board, { size: 3, first: true }) },
+  { alg: "NakedQuad", solve: (board) => solveNakedSets(board, { size: 4, first: true }) },
+  { alg: "HiddenQuad", solve: (board) => solveHiddenSets(board, { size: 4, first: true }) },
 ];
 
 // TODO: improve solveAll with bulk actions + stateful skipping (Owns the loop, selective calling, dirty house tracking)
